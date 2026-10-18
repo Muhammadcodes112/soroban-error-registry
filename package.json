@@ -1,0 +1,44 @@
+{
+  "name": "soroban-error-registry",
+  "version": "0.1.0",
+  "description": "Open, human-written explanations for Soroban contract error codes (Error(Contract, #N)).",
+  "main": "src/index.mjs",
+  "scripts": {
+    "validate": "node scripts/validate.mjs",
+    "validate:source": "node scripts/validate.mjs --check-source",
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm run validate && npm run build"
+  },
+  "keywords": [
+    "stellar",
+    "soroban",
+    "errors",
+    "debugging",
+    "blend"
+  ],
+  "author": "Akinshola Akinniyi (https://github.com/Akshola00)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./registry.json": "./dist/registry.json"
+  },
+  "bin": {
+    "soroban-explain": "bin/explain.mjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "dist",
+    "schema"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Akshola00/soroban-error-registry"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  }
+}

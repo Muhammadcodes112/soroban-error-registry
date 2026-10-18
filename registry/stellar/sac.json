@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "protocol": { "id": "stellar", "name": "Stellar built-in contracts", "website": "https://developers.stellar.org" },
+  "contract": {
+    "id": "sac",
+    "name": "Stellar Asset Contract (SAC)",
+    "notes": "Built into the Soroban host, so every classic asset and native XLM share this error set. Many protocols (e.g. Blend) reuse these low codes on purpose, so always check which contract emitted the error before using this file."
+  },
+  "source": {
+    "repo": "https://github.com/stellar/rs-soroban-env",
+    "path": "soroban-env-host/src/builtin_contracts/contract_error.rs",
+    "commit": "0c99950e96128beba3319aa96b116646ce974e69",
+    "enum": "ContractError"
+  },
+  "errors": [
+    {
+      "code": 2,
+      "name": "OperationNotSupportedError",
+      "summary": "This token does not support the operation you called.",
+      "explanation": "The asset contract recognised the function but refuses it for this asset or address type.",
+      "category": "user-input",
+      "common_causes": ["Calling an admin-style function such as mint or set_admin on the native XLM contract."],
+      "fixes": ["Check whether the operation makes sense for this asset; native XLM has no issuer-controlled functions."],
+      "status": "draft"
+    },
+    {
+      "code": 3,
+      "name": "AlreadyInitializedError",
+      "summary": "The asset contract has already been initialised.",
+      "explanation": "Initialisation runs once per asset contract; a second attempt is rejected.",
+      "category": "protocol-state",
+      "fixes": ["Skip initialisation and use the existing contract ID for this asset."],
+      "status": "draft"
+    },
+    {
+      "code": 4,
+      "name": "UnauthorizedError",
+      "summary": "The caller is not allowed to perform this asset operation.",
+      "explanation": "An admin-only function (for example mint, clawback or set_authorized) was invoked by an address that is not the asset admin, or the asset is not configured to allow it.",
+      "category": "permissions",
+      "common_causes": ["Minting from an account other than the issuer/admin.", "Clawback on an asset without clawback enabled."],
+      "fixes": ["Sign with the asset admin, or confirm the asset flags allow the operation."],
+      "status": "draft"
+    },
+    {
+      "code": 5,
+      "name": "AuthenticationError",
+      "summary": "Authorization for this asset operation failed.",
+      "category": "permissions",
+      "fixes": ["Re-simulate the transaction so the auth entries are regenerated, then sign with the correct account."],
+      "status": "draft"
+    },
+    {
+      "code": 6,
+      "name": "AccountMissingError",
+      "summary": "The account does not exist on the ledger.",
+      "explanation": "A classic G-address involved in the transfer has never been funded, so there is no account entry to hold or receive the asset.",
+      "category": "account-state",
+      "common_causes": ["Sending to a fresh testnet address that was never funded via Friendbot."],
+      "fixes": ["Create and fund the account first (CreateAccount, or Friendbot on testnet)."],
+      "references": [
+        { "title": "Stellar CLI agent guide — check balances", "url": "https://developers.stellar.org/docs/tools/cli/agent-cli/guides/check-balances-and-metadata" }
+      ],
+      "status": "draft"
+    },
+    {
+      "code": 7,
+      "name": "AccountIsNotClassic",
+      "summary": "This operation needs a classic G-account, not a contract address.",
+      "category": "user-input",
+      "fixes": ["Pass a G... account address for this argument."],
+      "status": "draft"
+    },
+    {
+      "code": 8,
+      "name": "NegativeAmountError",
+      "summary": "A negative amount was passed to the token.",
+      "category": "user-input",
+      "common_causes": ["A sign or decimal-scaling bug in client code."],
+      "fixes": ["Pass a non-negative i128 in the token's smallest unit (7 decimals for classic assets)."],
+      "status": "draft"
+    },
+    {
+      "code": 9,
+      "name": "AllowanceError",
+      "summary": "The spender's allowance is too low or has expired.",
+      "explanation": "transfer_from or burn_from tried to move more than the approved allowance, or the approval's expiration ledger has passed.",
+      "category": "account-state",
+      "common_causes": ["approve() was called with an expiration_ledger that is now in the past.", "A DEX or vault pulls more than the user approved."],
+      "fixes": ["Call approve() again with a sufficient amount and a later expiration_ledger."],
+      "status": "draft"
+    },
+    {
+      "code": 10,
+      "name": "BalanceError",
+      "summary": "Insufficient balance, or the result would break the balance limits.",
+      "explanation": "The sender does not hold enough of the asset, or the receiver's trustline limit would be exceeded.",
+      "category": "account-state",
+      "common_causes": ["Amount not scaled to the asset's decimals.", "Classic XLM balance blocked by minimum reserve.", "Receiver trustline limit too low."],
+      "fixes": ["Check the sender's balance with the token's balance() function.", "Raise the receiver's trustline limit if the receiver is the problem."],
+      "status": "draft"
+    },
+    {
+      "code": 11,
+      "name": "BalanceDeauthorizedError",
+      "summary": "The balance is frozen: the issuer has not authorised this holder.",
+      "explanation": "The asset requires authorisation and the trustline or contract balance involved is not authorised (or was revoked).",
+      "category": "account-state",
+      "fixes": ["Ask the issuer to authorise the trustline (SetTrustLineFlags) or the contract balance (set_authorized)."],
+      "status": "draft"
+    },
+    {
+      "code": 12,
+      "name": "OverflowError",
+      "summary": "An amount calculation overflowed.",
+      "category": "user-input",
+      "fixes": ["Check for absurdly large amounts, usually from scaling an already-scaled value."],
+      "status": "draft"
+    },
+    {
+      "code": 13,
+      "name": "TrustlineMissingError",
+      "summary": "The account has no trustline for this asset.",
+      "explanation": "Classic accounts must opt in to every non-native asset before they can hold it. The sender or the receiver has no trustline for this asset.",
+      "category": "account-state",
+      "common_causes": ["Receiving USDC (or any issued asset) on an account that never added the trustline.", "A swap whose output asset the user has not trusted yet."],
+      "fixes": ["Add a ChangeTrust operation for the asset before the payment or swap, ideally in the same transaction."],
+      "references": [
+        { "title": "Stellar docs — Verify trustlines", "url": "https://developers.stellar.org/docs/build/guides/basics/verify-trustlines" }
+      ],
+      "status": "draft"
+    },
+    {
+      "code": 14,
+      "name": "InsufficientAccountReserve",
+      "summary": "The account lacks the XLM reserve needed for this change.",
+      "explanation": "Creating a new ledger entry for a classic account (for example a trustline) raises its minimum XLM balance, and the account cannot cover it.",
+      "category": "account-state",
+      "fixes": ["Fund the account with more XLM, or remove unused trustlines/offers to free reserve."],
+      "status": "draft"
+    },
+    {
+      "code": 15,
+      "name": "TooManyAccountSubentries",
+      "summary": "The account has hit the maximum number of subentries.",
+      "category": "account-state",
+      "fixes": ["Remove unused trustlines, offers, signers or data entries from the account."],
+      "status": "draft"
+    }
+  ]
+}

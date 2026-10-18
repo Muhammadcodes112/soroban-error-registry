@@ -1,0 +1,29 @@
+name: Add a protocol / contract
+description: Request (or claim) error-code coverage for a Soroban contract
+labels: ["new-protocol"]
+body:
+  - type: input
+    id: protocol
+    attributes:
+      label: Protocol and contract
+      placeholder: "Soroswap — router"
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Link to the #[contracterror] enum
+      placeholder: "https://github.com/<org>/<repo>/blob/<commit>/path/to/error.rs"
+    validations:
+      required: true
+  - type: textarea
+    id: deployments
+    attributes:
+      label: Known deployments (optional)
+      description: Contract IDs or wasm hashes, each with an official link that proves it.
+  - type: checkboxes
+    id: claim
+    attributes:
+      label: Taking this on?
+      options:
+        - label: I'd like to write this file myself

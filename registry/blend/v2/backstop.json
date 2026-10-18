@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "protocol": { "id": "blend", "name": "Blend", "website": "https://www.blend.capital" },
+  "contract": {
+    "id": "backstop",
+    "name": "Blend v2 backstop",
+    "version": "v2",
+    "notes": "Insurance layer for Blend pools. Codes 1-12 match the Stellar Asset Contract; backstop-specific codes start at 1000. Withdrawals go through a queue-for-withdrawal (Q4W) step first."
+  },
+  "source": {
+    "repo": "https://github.com/blend-capital/blend-contracts-v2",
+    "path": "backstop/src/errors.rs",
+    "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+    "enum": "BackstopError"
+  },
+  "deployments": [],
+  "errors": [
+    { "code": 1, "name": "InternalError", "summary": "Declared for SAC parity; not raised by the v2 backstop code.", "category": "internal", "raised_in_source": false, "fixes": ["Check which contract emitted the error."], "status": "draft" },
+    { "code": 3, "name": "AlreadyInitializedError", "summary": "Declared for SAC parity; not raised by the v2 backstop code.", "category": "internal", "raised_in_source": false, "mirrors": "stellar/sac#3", "fixes": ["Check which contract emitted the error."], "status": "draft" },
+    { "code": 4, "name": "UnauthorizedError", "summary": "Declared for SAC parity; not raised by the v2 backstop code.", "category": "permissions", "raised_in_source": false, "mirrors": "stellar/sac#4", "fixes": ["Check which contract emitted the error."], "status": "draft" },
+    { "code": 8, "name": "NegativeAmountError", "summary": "A negative amount was passed to the backstop.", "category": "user-input", "mirrors": "stellar/sac#8", "fixes": ["Pass a non-negative amount."], "status": "draft" },
+    {
+      "code": 10,
+      "name": "BalanceError",
+      "summary": "Not enough backstop shares to queue or withdraw that amount.",
+      "explanation": "Raised when queuing more shares for withdrawal than the user holds, or when withdrawing more than their expired queue entries cover.",
+      "category": "account-state",
+      "mirrors": "stellar/sac#10",
+      "fixes": ["Queue or withdraw at most your available (or expired-queued) share amount."],
+      "status": "draft"
+    },
+    { "code": 12, "name": "OverflowError", "summary": "Declared for SAC parity; not raised by the v2 backstop code.", "category": "internal", "raised_in_source": false, "mirrors": "stellar/sac#12", "fixes": ["Check which contract emitted the error."], "status": "draft" },
+    {
+      "code": 1000,
+      "name": "BadRequest",
+      "summary": "The backstop rejected a malformed request.",
+      "explanation": "For example, adding a pool to the reward zone twice, or trying to remove a pool that still meets the backstop threshold.",
+      "category": "user-input",
+      "fixes": ["Re-check the call arguments and current reward-zone state."],
+      "status": "draft"
+    },
+    {
+      "code": 1001,
+      "name": "NotExpired",
+      "summary": "The queued withdrawal has not finished its waiting period.",
+      "explanation": "Backstop withdrawals must sit in the withdrawal queue until their expiration time before they can be withdrawn.",
+      "category": "account-state",
+      "fixes": ["Wait for the queue entry to expire, then call withdraw."],
+      "status": "draft"
+    },
+    {
+      "code": 1002,
+      "name": "InvalidRewardZoneEntry",
+      "summary": "This pool cannot enter the reward zone.",
+      "explanation": "The pool is below the backstop threshold, or it does not have more backstop deposits than the pool it would replace.",
+      "category": "protocol-state",
+      "fixes": ["Increase the pool's backstop deposits above the threshold (and above the pool being replaced)."],
+      "status": "draft"
+    },
+    {
+      "code": 1003,
+      "name": "InsufficientFunds",
+      "summary": "The pool's backstop balance cannot cover this withdrawal or dequeue.",
+      "category": "account-state",
+      "fixes": ["Withdraw or dequeue a smaller amount."],
+      "status": "draft"
+    },
+    {
+      "code": 1004,
+      "name": "NotPool",
+      "summary": "The address is not a pool deployed by the Blend pool factory.",
+      "category": "user-input",
+      "fixes": ["Use the address of a pool created by the official Blend pool factory."],
+      "status": "draft"
+    },
+    {
+      "code": 1005,
+      "name": "InvalidShareMintAmount",
+      "summary": "The deposit is too small to mint any backstop shares.",
+      "category": "user-input",
+      "fixes": ["Deposit a larger amount."],
+      "status": "draft"
+    },
+    {
+      "code": 1006,
+      "name": "InvalidTokenWithdrawAmount",
+      "summary": "The withdrawal is too small to return any tokens.",
+      "category": "user-input",
+      "fixes": ["Withdraw a larger number of shares."],
+      "status": "draft"
+    },
+    {
+      "code": 1007,
+      "name": "TooManyQ4WEntries",
+      "summary": "The account has too many pending withdrawal queue entries.",
+      "category": "account-state",
+      "fixes": ["Wait for existing entries to expire and withdraw them, or dequeue some, before queuing more."],
+      "status": "draft"
+    },
+    { "code": 1008, "name": "NotInRewardZone", "summary": "Declared but not raised by the v2 backstop code at the pinned commit.", "category": "protocol-state", "raised_in_source": false, "fixes": ["Check which contract emitted the error."], "status": "draft" },
+    {
+      "code": 1009,
+      "name": "RewardZoneFull",
+      "summary": "The reward zone is full; a pool must be named to replace.",
+      "category": "protocol-state",
+      "fixes": ["Pass a to_remove pool with fewer backstop deposits than the pool being added."],
+      "status": "draft"
+    },
+    {
+      "code": 1010,
+      "name": "MaxBackfillEmissions",
+      "summary": "The maximum amount of backfilled emissions has already been reached.",
+      "category": "protocol-state",
+      "fixes": ["No user fix; backfilled emissions are capped by the protocol."],
+      "status": "draft"
+    },
+    {
+      "code": 1011,
+      "name": "BadDebtExists",
+      "summary": "The backstop still holds bad debt in this pool.",
+      "explanation": "The backstop has outstanding liabilities in the pool, which must be cleared (via a bad-debt auction) before this action.",
+      "category": "protocol-state",
+      "fixes": ["Wait for the bad-debt auction to clear the backstop's liabilities."],
+      "status": "draft"
+    }
+  ]
+}

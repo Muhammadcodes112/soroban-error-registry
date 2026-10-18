@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Akshola00/soroban-error-registry/schema/protocol.schema.json",
+  "title": "Soroban Error Registry \u2014 contract error file",
+  "description": "Human-readable explanations for the numeric errors one Soroban contract can return as Error(Contract, #N).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol",
+    "contract",
+    "source",
+    "errors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug",
+          "description": "Folder name under registry/, e.g. 'blend'."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "website": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug",
+          "description": "Contract slug, e.g. 'pool'. The lookup key is the file path under registry/, e.g. 'blend/v2/pool'."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "description": "Protocol version this file describes, e.g. 'v2'."
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo",
+        "path",
+        "commit"
+      ],
+      "description": "Where the error enum lives. Codes and names must match this file at this commit.",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "format": "uri"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "enum": {
+          "type": "string",
+          "description": "Rust enum name, e.g. 'PoolError'."
+        }
+      }
+    },
+    "deployments": {
+      "type": "array",
+      "description": "Known on-chain deployments using this error set. Every entry needs a verification link.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "verified_by"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "contract_id"
+            ]
+          },
+          {
+            "required": [
+              "wasm_hash"
+            ]
+          }
+        ],
+        "properties": {
+          "network": {
+            "enum": [
+              "mainnet",
+              "testnet",
+              "futurenet"
+            ]
+          },
+          "contract_id": {
+            "type": "string",
+            "pattern": "^C[A-Z2-7]{55}$"
+          },
+          "wasm_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "verified_by": {
+            "type": "string",
+            "format": "uri",
+            "description": "Official docs, explorer page or release note that proves this deployment."
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "name",
+        "summary",
+        "category",
+        "fixes",
+        "status"
+      ],
+      "properties": {
+        "code": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "Exact enum variant name from source."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 140,
+          "description": "One line a wallet or explorer could show as-is."
+        },
+        "explanation": {
+          "type": "string",
+          "description": "What the contract checked and why it said no."
+        },
+        "category": {
+          "enum": [
+            "user-input",
+            "account-state",
+            "protocol-state",
+            "permissions",
+            "oracle",
+            "admin-config",
+            "internal"
+          ]
+        },
+        "common_causes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fixes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "raised_in_source": {
+          "type": "boolean",
+          "default": true,
+          "description": "false when the variant is declared but never raised at the pinned commit."
+        },
+        "mirrors": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+(/[a-z0-9-]+)+#[0-9]+$",
+          "description": "Registry key + code this entry deliberately shares, e.g. 'stellar/sac#10'."
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "title",
+              "url"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "reviewed"
+          ],
+          "description": "'reviewed' needs at least one reviewer who is not the author."
+        },
+        "reviewed_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^@[A-Za-z0-9-]+$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "protocol": { "id": "blend", "name": "Blend", "website": "https://www.blend.capital" },
+  "contract": { "id": "pool-factory", "name": "Blend v2 pool factory", "version": "v2" },
+  "source": {
+    "repo": "https://github.com/blend-capital/blend-contracts-v2",
+    "path": "pool-factory/src/errors.rs",
+    "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+    "enum": "PoolFactoryError"
+  },
+  "deployments": [],
+  "errors": [
+    { "code": 1, "name": "InternalError", "summary": "Declared for SAC parity; not raised by the v2 pool factory code.", "category": "internal", "raised_in_source": false, "fixes": ["Check which contract emitted the error."], "status": "draft" },
+    { "code": 3, "name": "AlreadyInitializedError", "summary": "Declared for SAC parity; not raised by the v2 pool factory code.", "category": "internal", "raised_in_source": false, "mirrors": "stellar/sac#3", "fixes": ["Check which contract emitted the error."], "status": "draft" },
+    {
+      "code": 1300,
+      "name": "InvalidPoolInitArgs",
+      "summary": "The factory rejected the new pool's settings.",
+      "explanation": "deploy() checks that the backstop take rate is below 100% (7 decimals), max_positions is between 2 and 60, and min_collateral is not negative.",
+      "category": "admin-config",
+      "fixes": ["Fix the out-of-range argument and redeploy."],
+      "status": "draft"
+    }
+  ]
+}

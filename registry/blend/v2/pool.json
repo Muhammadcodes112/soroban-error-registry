@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "protocol": { "id": "blend", "name": "Blend", "website": "https://www.blend.capital" },
+  "contract": {
+    "id": "pool",
+    "name": "Blend v2 lending pool",
+    "version": "v2",
+    "notes": "Codes 1-12 deliberately match the Stellar Asset Contract. Pool-specific codes start at 1200. Most user-facing failures go through submit(), which takes a list of requests (supply, withdraw, borrow, repay, ...)."
+  },
+  "source": {
+    "repo": "https://github.com/blend-capital/blend-contracts-v2",
+    "path": "pool/src/errors.rs",
+    "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+    "enum": "PoolError"
+  },
+  "deployments": [],
+  "errors": [
+    {
+      "code": 1,
+      "name": "InternalError",
+      "summary": "The pool hit an internal state it should never reach.",
+      "explanation": "Raised for invariants that should not fail, e.g. interest accrual being run with no time elapsed.",
+      "category": "internal",
+      "fixes": ["Retry in a later ledger; if it persists, report it to the Blend team with the transaction hash."],
+      "status": "draft"
+    },
+    {
+      "code": 3,
+      "name": "AlreadyInitializedError",
+      "summary": "Declared for SAC parity; not raised by the v2 pool code.",
+      "category": "internal",
+      "raised_in_source": false,
+      "mirrors": "stellar/sac#3",
+      "fixes": ["If you see #3, check whether the emitting contract is actually a token contract, not the pool."],
+      "status": "draft"
+    },
+    {
+      "code": 4,
+      "name": "UnauthorizedError",
+      "summary": "Declared for SAC parity; not raised by the v2 pool code.",
+      "category": "permissions",
+      "raised_in_source": false,
+      "mirrors": "stellar/sac#4",
+      "fixes": ["Check which contract emitted the error; it is most likely a token contract the pool called."],
+      "status": "draft"
+    },
+    {
+      "code": 8,
+      "name": "NegativeAmountError",
+      "summary": "A request amount was negative.",
+      "category": "user-input",
+      "mirrors": "stellar/sac#8",
+      "fixes": ["Send non-negative amounts in each Request."],
+      "status": "draft"
+    },
+    {
+      "code": 10,
+      "name": "BalanceError",
+      "summary": "Declared for SAC parity; not raised by the v2 pool code.",
+      "explanation": "An Error(Contract, #10) inside a pool transaction almost always comes from the underlying token (SAC) when the user's wallet balance is too low to supply or repay.",
+      "category": "account-state",
+      "raised_in_source": false,
+      "mirrors": "stellar/sac#10",
+      "fixes": ["Check the user's balance of the asset being supplied or repaid."],
+      "status": "draft"
+    },
+    {
+      "code": 12,
+      "name": "OverflowError",
+      "summary": "Declared for SAC parity; not raised by the v2 pool code.",
+      "category": "internal",
+      "raised_in_source": false,
+      "mirrors": "stellar/sac#12",
+      "fixes": ["Check for unscaled or extremely large amounts."],
+      "status": "draft"
+    },
+    {
+      "code": 1200,
+      "name": "BadRequest",
+      "summary": "The pool rejected a malformed request.",
+      "explanation": "Catch-all for invalid arguments, e.g. adding a reserve past the reserve limit, invalid emission metadata, or emitting too few tokens to avoid rounding issues.",
+      "category": "user-input",
+      "fixes": ["Re-check the arguments of the call against the Blend v2 docs."],
+      "status": "draft"
+    },
+    {
+      "code": 1201,
+      "name": "InvalidPoolConfigArgs",
+      "summary": "Pool configuration values are out of range.",
+      "explanation": "Raised when updating pool config with a backstop take rate of 100% or more, max_positions below 2 or above twice the reserve limit, or a negative min_collateral.",
+      "category": "admin-config",
+      "fixes": ["Keep backstop rate below 1 (7 decimals), max_positions in range, and min_collateral >= 0."],
+      "status": "draft"
+    },
+    {
+      "code": 1202,
+      "name": "InvalidReserveMetadata",
+      "summary": "The reserve configuration is invalid.",
+      "explanation": "Interest-rate parameters are out of bounds or out of order (r_one <= r_two <= r_three), reactivity is too high, or an update tries to change decimals or turn an enabled collateral factor off.",
+      "category": "admin-config",
+      "fixes": ["Validate the ReserveConfig fields; decimals cannot change once a reserve exists."],
+      "status": "draft"
+    },
+    {
+      "code": 1203,
+      "name": "InitNotUnlocked",
+      "summary": "The queued reserve change is still time-locked.",
+      "explanation": "Reserve additions/changes are queued first and can only be applied after their unlock time.",
+      "category": "admin-config",
+      "fixes": ["Wait until the queued change's unlock_time, then call set_reserve again."],
+      "status": "draft"
+    },
+    {
+      "code": 1204,
+      "name": "StatusNotAllowed",
+      "summary": "The pool cannot move to the requested status right now.",
+      "explanation": "Status changes are gated: a pool in Setup or admin-frozen cannot be changed this way, and activating requires the backstop threshold to be met with less than 50% of backstop deposits queued for withdrawal.",
+      "category": "protocol-state",
+      "fixes": ["Check the backstop deposit level and queued withdrawals before changing status."],
+      "status": "draft"
+    },
+    {
+      "code": 1205,
+      "name": "InvalidHf",
+      "summary": "This action would leave the position under-collateralised.",
+      "explanation": "After applying the requests, the account's health factor would drop below ~1.00001. Borrowing more or withdrawing collateral is refused.",
+      "category": "account-state",
+      "common_causes": ["Borrowing close to the limit while prices move.", "Withdrawing collateral that backs an open loan."],
+      "fixes": ["Borrow less, add collateral, or repay part of the loan first (put the repay request before the withdraw in the same submit)."],
+      "status": "draft"
+    },
+    {
+      "code": 1206,
+      "name": "InvalidPoolStatus",
+      "summary": "The pool's current status does not allow this action.",
+      "explanation": "Pools that are not active block borrowing (and auction cancellation); frozen pools also block supplying.",
+      "category": "protocol-state",
+      "fixes": ["Check the pool status in the Blend UI; repay and withdraw normally still work."],
+      "status": "draft"
+    },
+    {
+      "code": 1207,
+      "name": "InvalidUtilRate",
+      "summary": "Not enough free liquidity in this reserve.",
+      "explanation": "The action would push the reserve's utilisation above its configured maximum (for borrows) or to 100% (for withdrawals).",
+      "category": "protocol-state",
+      "fixes": ["Borrow or withdraw a smaller amount, or wait for repayments/new supply."],
+      "status": "draft"
+    },
+    {
+      "code": 1208,
+      "name": "MaxPositionsExceeded",
+      "summary": "The account would exceed the pool's maximum number of positions.",
+      "category": "account-state",
+      "fixes": ["Close an existing supply/collateral/borrow position in this pool before opening a new one."],
+      "status": "draft"
+    },
+    {
+      "code": 1209,
+      "name": "InternalReserveNotFound",
+      "summary": "The pool could not find a reserve it expected to have loaded.",
+      "category": "internal",
+      "fixes": ["Confirm the asset is a reserve of this pool; otherwise report it with the transaction hash."],
+      "status": "draft"
+    },
+    {
+      "code": 1210,
+      "name": "InvalidPrice",
+      "summary": "The oracle price is stale or invalid.",
+      "explanation": "The oracle's last price is older than 24 hours or is zero/negative.",
+      "category": "oracle",
+      "fixes": ["Wait for the oracle to update; nothing in the user's transaction can fix this."],
+      "status": "draft"
+    },
+    {
+      "code": 1211,
+      "name": "InvalidLiquidation",
+      "summary": "This position cannot be liquidated.",
+      "explanation": "The target is the pool or backstop itself, the percent is 0 or above 100, or the user's collateral still exceeds their liabilities.",
+      "category": "user-input",
+      "fixes": ["Re-check the position's health and use a liquidation percent between 1 and 100."],
+      "status": "draft"
+    },
+    {
+      "code": 1212,
+      "name": "AuctionInProgress",
+      "summary": "An auction is already running for this user or the backstop.",
+      "category": "protocol-state",
+      "fixes": ["Fill or wait for the existing auction instead of creating a new one."],
+      "status": "draft"
+    },
+    {
+      "code": 1213,
+      "name": "InvalidLiqTooLarge",
+      "summary": "The liquidation would take too much: post-liquidation health would exceed 1.15.",
+      "category": "user-input",
+      "fixes": ["Lower the liquidation percent."],
+      "status": "draft"
+    },
+    {
+      "code": 1214,
+      "name": "InvalidLiqTooSmall",
+      "summary": "The liquidation is too small: post-liquidation health would stay under 1.03.",
+      "category": "user-input",
+      "fixes": ["Raise the liquidation percent."],
+      "status": "draft"
+    },
+    {
+      "code": 1215,
+      "name": "InterestTooSmall",
+      "summary": "Accrued interest is below the minimum needed for an interest auction.",
+      "explanation": "Interest auctions require at least about 200 USDC worth of accrued backstop interest.",
+      "category": "protocol-state",
+      "fixes": ["Wait until more interest has accrued."],
+      "status": "draft"
+    },
+    {
+      "code": 1216,
+      "name": "InvalidBTokenMintAmount",
+      "summary": "The supply amount rounds to zero bTokens.",
+      "category": "user-input",
+      "fixes": ["Supply a larger amount."],
+      "status": "draft"
+    },
+    {
+      "code": 1217,
+      "name": "InvalidBTokenBurnAmount",
+      "summary": "The withdraw amount rounds to zero bTokens.",
+      "category": "user-input",
+      "fixes": ["Withdraw a larger amount."],
+      "status": "draft"
+    },
+    {
+      "code": 1218,
+      "name": "InvalidDTokenMintAmount",
+      "summary": "The borrow amount rounds to zero dTokens.",
+      "category": "user-input",
+      "fixes": ["Borrow a larger amount."],
+      "status": "draft"
+    },
+    {
+      "code": 1219,
+      "name": "InvalidDTokenBurnAmount",
+      "summary": "The repay amount rounds to zero dTokens.",
+      "category": "user-input",
+      "fixes": ["Repay a larger amount."],
+      "status": "draft"
+    },
+    {
+      "code": 1220,
+      "name": "ExceededSupplyCap",
+      "summary": "This deposit would exceed the reserve's supply cap.",
+      "category": "protocol-state",
+      "fixes": ["Supply less, or wait for withdrawals to free room under the cap."],
+      "status": "draft"
+    },
+    {
+      "code": 1221,
+      "name": "InvalidBid",
+      "summary": "The auction bid side is empty or not a valid liability.",
+      "category": "user-input",
+      "fixes": ["Include at least one asset the user actually owes in the auction bid."],
+      "status": "draft"
+    },
+    {
+      "code": 1222,
+      "name": "InvalidLot",
+      "summary": "The auction lot side is empty or invalid.",
+      "explanation": "The lot must contain collateral the user holds; for interest auctions it must be exactly the backstop token.",
+      "category": "user-input",
+      "fixes": ["Include valid collateral (or only the backstop token) in the lot."],
+      "status": "draft"
+    },
+    {
+      "code": 1223,
+      "name": "ReserveDisabled",
+      "summary": "This reserve is disabled for new supply and borrowing.",
+      "category": "protocol-state",
+      "fixes": ["Use another reserve; repaying and withdrawing from this one still works."],
+      "status": "draft"
+    },
+    {
+      "code": 1224,
+      "name": "MinCollateralNotMet",
+      "summary": "Collateral is below the pool's minimum for borrowing.",
+      "explanation": "The position is healthy, but its total collateral value is below the pool's min_collateral setting.",
+      "category": "account-state",
+      "fixes": ["Add more collateral before borrowing."],
+      "status": "draft"
+    }
+  ]
+}

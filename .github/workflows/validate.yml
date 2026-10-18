@@ -1,0 +1,24 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Schema, consistency and upstream source check
+        run: npm run validate:source
+      - run: npm test
+      - name: dist/registry.json is up to date
+        run: |
+          npm run build
+          git diff --exit-code dist/ || (echo "::error::Run 'npm run build' and commit dist/registry.json" && exit 1)

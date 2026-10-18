@@ -1,0 +1,5 @@
+The contents of registry/ and dist/ are dedicated to the public domain under
+CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
+
+The code in this repository (scripts/, src/, bin/, test/) is licensed under
+the MIT License; see LICENSE.

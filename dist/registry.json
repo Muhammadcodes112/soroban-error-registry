@@ -1,0 +1,844 @@
+{
+  "schema_version": 1,
+  "contracts": {
+    "blend/v2/backstop": {
+      "protocol": {
+        "id": "blend",
+        "name": "Blend",
+        "website": "https://www.blend.capital"
+      },
+      "contract": {
+        "id": "backstop",
+        "name": "Blend v2 backstop",
+        "version": "v2",
+        "notes": "Insurance layer for Blend pools. Codes 1-12 match the Stellar Asset Contract; backstop-specific codes start at 1000. Withdrawals go through a queue-for-withdrawal (Q4W) step first."
+      },
+      "source": {
+        "repo": "https://github.com/blend-capital/blend-contracts-v2",
+        "path": "backstop/src/errors.rs",
+        "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+        "enum": "BackstopError"
+      },
+      "errors": {
+        "1": {
+          "code": 1,
+          "name": "InternalError",
+          "summary": "Declared for SAC parity; not raised by the v2 backstop code.",
+          "category": "internal",
+          "raised_in_source": false,
+          "fixes": [
+            "Check which contract emitted the error."
+          ],
+          "status": "draft"
+        },
+        "3": {
+          "code": 3,
+          "name": "AlreadyInitializedError",
+          "summary": "Declared for SAC parity; not raised by the v2 backstop code.",
+          "category": "internal",
+          "raised_in_source": false,
+          "mirrors": "stellar/sac#3",
+          "fixes": [
+            "Check which contract emitted the error."
+          ],
+          "status": "draft"
+        },
+        "4": {
+          "code": 4,
+          "name": "UnauthorizedError",
+          "summary": "Declared for SAC parity; not raised by the v2 backstop code.",
+          "category": "permissions",
+          "raised_in_source": false,
+          "mirrors": "stellar/sac#4",
+          "fixes": [
+            "Check which contract emitted the error."
+          ],
+          "status": "draft"
+        },
+        "8": {
+          "code": 8,
+          "name": "NegativeAmountError",
+          "summary": "A negative amount was passed to the backstop.",
+          "category": "user-input",
+          "mirrors": "stellar/sac#8",
+          "fixes": [
+            "Pass a non-negative amount."
+          ],
+          "status": "draft"
+        },
+        "10": {
+          "code": 10,
+          "name": "BalanceError",
+          "summary": "Not enough backstop shares to queue or withdraw that amount.",
+          "explanation": "Raised when queuing more shares for withdrawal than the user holds, or when withdrawing more than their expired queue entries cover.",
+          "category": "account-state",
+          "mirrors": "stellar/sac#10",
+          "fixes": [
+            "Queue or withdraw at most your available (or expired-queued) share amount."
+          ],
+          "status": "draft"
+        },
+        "12": {
+          "code": 12,
+          "name": "OverflowError",
+          "summary": "Declared for SAC parity; not raised by the v2 backstop code.",
+          "category": "internal",
+          "raised_in_source": false,
+          "mirrors": "stellar/sac#12",
+          "fixes": [
+            "Check which contract emitted the error."
+          ],
+          "status": "draft"
+        },
+        "1000": {
+          "code": 1000,
+          "name": "BadRequest",
+          "summary": "The backstop rejected a malformed request.",
+          "explanation": "For example, adding a pool to the reward zone twice, or trying to remove a pool that still meets the backstop threshold.",
+          "category": "user-input",
+          "fixes": [
+            "Re-check the call arguments and current reward-zone state."
+          ],
+          "status": "draft"
+        },
+        "1001": {
+          "code": 1001,
+          "name": "NotExpired",
+          "summary": "The queued withdrawal has not finished its waiting period.",
+          "explanation": "Backstop withdrawals must sit in the withdrawal queue until their expiration time before they can be withdrawn.",
+          "category": "account-state",
+          "fixes": [
+            "Wait for the queue entry to expire, then call withdraw."
+          ],
+          "status": "draft"
+        },
+        "1002": {
+          "code": 1002,
+          "name": "InvalidRewardZoneEntry",
+          "summary": "This pool cannot enter the reward zone.",
+          "explanation": "The pool is below the backstop threshold, or it does not have more backstop deposits than the pool it would replace.",
+          "category": "protocol-state",
+          "fixes": [
+            "Increase the pool's backstop deposits above the threshold (and above the pool being replaced)."
+          ],
+          "status": "draft"
+        },
+        "1003": {
+          "code": 1003,
+          "name": "InsufficientFunds",
+          "summary": "The pool's backstop balance cannot cover this withdrawal or dequeue.",
+          "category": "account-state",
+          "fixes": [
+            "Withdraw or dequeue a smaller amount."
+          ],
+          "status": "draft"
+        },
+        "1004": {
+          "code": 1004,
+          "name": "NotPool",
+          "summary": "The address is not a pool deployed by the Blend pool factory.",
+          "category": "user-input",
+          "fixes": [
+            "Use the address of a pool created by the official Blend pool factory."
+          ],
+          "status": "draft"
+        },
+        "1005": {
+          "code": 1005,
+          "name": "InvalidShareMintAmount",
+          "summary": "The deposit is too small to mint any backstop shares.",
+          "category": "user-input",
+          "fixes": [
+            "Deposit a larger amount."
+          ],
+          "status": "draft"
+        },
+        "1006": {
+          "code": 1006,
+          "name": "InvalidTokenWithdrawAmount",
+          "summary": "The withdrawal is too small to return any tokens.",
+          "category": "user-input",
+          "fixes": [
+            "Withdraw a larger number of shares."
+          ],
+          "status": "draft"
+        },
+        "1007": {
+          "code": 1007,
+          "name": "TooManyQ4WEntries",
+          "summary": "The account has too many pending withdrawal queue entries.",
+          "category": "account-state",
+          "fixes": [
+            "Wait for existing entries to expire and withdraw them, or dequeue some, before queuing more."
+          ],
+          "status": "draft"
+        },
+        "1008": {
+          "code": 1008,
+          "name": "NotInRewardZone",
+          "summary": "Declared but not raised by the v2 backstop code at the pinned commit.",
+          "category": "protocol-state",
+          "raised_in_source": false,
+          "fixes": [
+            "Check which contract emitted the error."
+          ],
+          "status": "draft"
+        },
+        "1009": {
+          "code": 1009,
+          "name": "RewardZoneFull",
+          "summary": "The reward zone is full; a pool must be named to replace.",
+          "category": "protocol-state",
+          "fixes": [
+            "Pass a to_remove pool with fewer backstop deposits than the pool being added."
+          ],
+          "status": "draft"
+        },
+        "1010": {
+          "code": 1010,
+          "name": "MaxBackfillEmissions",
+          "summary": "The maximum amount of backfilled emissions has already been reached.",
+          "category": "protocol-state",
+          "fixes": [
+            "No user fix; backfilled emissions are capped by the protocol."
+          ],
+          "status": "draft"
+        },
+        "1011": {
+          "code": 1011,
+          "name": "BadDebtExists",
+          "summary": "The backstop still holds bad debt in this pool.",
+          "explanation": "The backstop has outstanding liabilities in the pool, which must be cleared (via a bad-debt auction) before this action.",
+          "category": "protocol-state",
+          "fixes": [
+            "Wait for the bad-debt auction to clear the backstop's liabilities."
+          ],
+          "status": "draft"
+        }
+      }
+    },
+    "blend/v2/pool-factory": {
+      "protocol": {
+        "id": "blend",
+        "name": "Blend",
+        "website": "https://www.blend.capital"
+      },
+      "contract": {
+        "id": "pool-factory",
+        "name": "Blend v2 pool factory",
+        "version": "v2"
+      },
+      "source": {
+        "repo": "https://github.com/blend-capital/blend-contracts-v2",
+        "path": "pool-factory/src/errors.rs",
+        "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+        "enum": "PoolFactoryError"
+      },
+      "errors": {
+        "1": {
+          "code": 1,
+          "name": "InternalError",
+          "summary": "Declared for SAC parity; not raised by the v2 pool factory code.",
+          "category": "internal",
+          "raised_in_source": false,
+          "fixes": [
+            "Check which contract emitted the error."
+          ],
+          "status": "draft"
+        },
+        "3": {
+          "code": 3,
+          "name": "AlreadyInitializedError",
+          "summary": "Declared for SAC parity; not raised by the v2 pool factory code.",
+          "category": "internal",
+          "raised_in_source": false,
+          "mirrors": "stellar/sac#3",
+          "fixes": [
+            "Check which contract emitted the error."
+          ],
+          "status": "draft"
+        },
+        "1300": {
+          "code": 1300,
+          "name": "InvalidPoolInitArgs",
+          "summary": "The factory rejected the new pool's settings.",
+          "explanation": "deploy() checks that the backstop take rate is below 100% (7 decimals), max_positions is between 2 and 60, and min_collateral is not negative.",
+          "category": "admin-config",
+          "fixes": [
+            "Fix the out-of-range argument and redeploy."
+          ],
+          "status": "draft"
+        }
+      }
+    },
+    "blend/v2/pool": {
+      "protocol": {
+        "id": "blend",
+        "name": "Blend",
+        "website": "https://www.blend.capital"
+      },
+      "contract": {
+        "id": "pool",
+        "name": "Blend v2 lending pool",
+        "version": "v2",
+        "notes": "Codes 1-12 deliberately match the Stellar Asset Contract. Pool-specific codes start at 1200. Most user-facing failures go through submit(), which takes a list of requests (supply, withdraw, borrow, repay, ...)."
+      },
+      "source": {
+        "repo": "https://github.com/blend-capital/blend-contracts-v2",
+        "path": "pool/src/errors.rs",
+        "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+        "enum": "PoolError"
+      },
+      "errors": {
+        "1": {
+          "code": 1,
+          "name": "InternalError",
+          "summary": "The pool hit an internal state it should never reach.",
+          "explanation": "Raised for invariants that should not fail, e.g. interest accrual being run with no time elapsed.",
+          "category": "internal",
+          "fixes": [
+            "Retry in a later ledger; if it persists, report it to the Blend team with the transaction hash."
+          ],
+          "status": "draft"
+        },
+        "3": {
+          "code": 3,
+          "name": "AlreadyInitializedError",
+          "summary": "Declared for SAC parity; not raised by the v2 pool code.",
+          "category": "internal",
+          "raised_in_source": false,
+          "mirrors": "stellar/sac#3",
+          "fixes": [
+            "If you see #3, check whether the emitting contract is actually a token contract, not the pool."
+          ],
+          "status": "draft"
+        },
+        "4": {
+          "code": 4,
+          "name": "UnauthorizedError",
+          "summary": "Declared for SAC parity; not raised by the v2 pool code.",
+          "category": "permissions",
+          "raised_in_source": false,
+          "mirrors": "stellar/sac#4",
+          "fixes": [
+            "Check which contract emitted the error; it is most likely a token contract the pool called."
+          ],
+          "status": "draft"
+        },
+        "8": {
+          "code": 8,
+          "name": "NegativeAmountError",
+          "summary": "A request amount was negative.",
+          "category": "user-input",
+          "mirrors": "stellar/sac#8",
+          "fixes": [
+            "Send non-negative amounts in each Request."
+          ],
+          "status": "draft"
+        },
+        "10": {
+          "code": 10,
+          "name": "BalanceError",
+          "summary": "Declared for SAC parity; not raised by the v2 pool code.",
+          "explanation": "An Error(Contract, #10) inside a pool transaction almost always comes from the underlying token (SAC) when the user's wallet balance is too low to supply or repay.",
+          "category": "account-state",
+          "raised_in_source": false,
+          "mirrors": "stellar/sac#10",
+          "fixes": [
+            "Check the user's balance of the asset being supplied or repaid."
+          ],
+          "status": "draft"
+        },
+        "12": {
+          "code": 12,
+          "name": "OverflowError",
+          "summary": "Declared for SAC parity; not raised by the v2 pool code.",
+          "category": "internal",
+          "raised_in_source": false,
+          "mirrors": "stellar/sac#12",
+          "fixes": [
+            "Check for unscaled or extremely large amounts."
+          ],
+          "status": "draft"
+        },
+        "1200": {
+          "code": 1200,
+          "name": "BadRequest",
+          "summary": "The pool rejected a malformed request.",
+          "explanation": "Catch-all for invalid arguments, e.g. adding a reserve past the reserve limit, invalid emission metadata, or emitting too few tokens to avoid rounding issues.",
+          "category": "user-input",
+          "fixes": [
+            "Re-check the arguments of the call against the Blend v2 docs."
+          ],
+          "status": "draft"
+        },
+        "1201": {
+          "code": 1201,
+          "name": "InvalidPoolConfigArgs",
+          "summary": "Pool configuration values are out of range.",
+          "explanation": "Raised when updating pool config with a backstop take rate of 100% or more, max_positions below 2 or above twice the reserve limit, or a negative min_collateral.",
+          "category": "admin-config",
+          "fixes": [
+            "Keep backstop rate below 1 (7 decimals), max_positions in range, and min_collateral >= 0."
+          ],
+          "status": "draft"
+        },
+        "1202": {
+          "code": 1202,
+          "name": "InvalidReserveMetadata",
+          "summary": "The reserve configuration is invalid.",
+          "explanation": "Interest-rate parameters are out of bounds or out of order (r_one <= r_two <= r_three), reactivity is too high, or an update tries to change decimals or turn an enabled collateral factor off.",
+          "category": "admin-config",
+          "fixes": [
+            "Validate the ReserveConfig fields; decimals cannot change once a reserve exists."
+          ],
+          "status": "draft"
+        },
+        "1203": {
+          "code": 1203,
+          "name": "InitNotUnlocked",
+          "summary": "The queued reserve change is still time-locked.",
+          "explanation": "Reserve additions/changes are queued first and can only be applied after their unlock time.",
+          "category": "admin-config",
+          "fixes": [
+            "Wait until the queued change's unlock_time, then call set_reserve again."
+          ],
+          "status": "draft"
+        },
+        "1204": {
+          "code": 1204,
+          "name": "StatusNotAllowed",
+          "summary": "The pool cannot move to the requested status right now.",
+          "explanation": "Status changes are gated: a pool in Setup or admin-frozen cannot be changed this way, and activating requires the backstop threshold to be met with less than 50% of backstop deposits queued for withdrawal.",
+          "category": "protocol-state",
+          "fixes": [
+            "Check the backstop deposit level and queued withdrawals before changing status."
+          ],
+          "status": "draft"
+        },
+        "1205": {
+          "code": 1205,
+          "name": "InvalidHf",
+          "summary": "This action would leave the position under-collateralised.",
+          "explanation": "After applying the requests, the account's health factor would drop below ~1.00001. Borrowing more or withdrawing collateral is refused.",
+          "category": "account-state",
+          "common_causes": [
+            "Borrowing close to the limit while prices move.",
+            "Withdrawing collateral that backs an open loan."
+          ],
+          "fixes": [
+            "Borrow less, add collateral, or repay part of the loan first (put the repay request before the withdraw in the same submit)."
+          ],
+          "status": "draft"
+        },
+        "1206": {
+          "code": 1206,
+          "name": "InvalidPoolStatus",
+          "summary": "The pool's current status does not allow this action.",
+          "explanation": "Pools that are not active block borrowing (and auction cancellation); frozen pools also block supplying.",
+          "category": "protocol-state",
+          "fixes": [
+            "Check the pool status in the Blend UI; repay and withdraw normally still work."
+          ],
+          "status": "draft"
+        },
+        "1207": {
+          "code": 1207,
+          "name": "InvalidUtilRate",
+          "summary": "Not enough free liquidity in this reserve.",
+          "explanation": "The action would push the reserve's utilisation above its configured maximum (for borrows) or to 100% (for withdrawals).",
+          "category": "protocol-state",
+          "fixes": [
+            "Borrow or withdraw a smaller amount, or wait for repayments/new supply."
+          ],
+          "status": "draft"
+        },
+        "1208": {
+          "code": 1208,
+          "name": "MaxPositionsExceeded",
+          "summary": "The account would exceed the pool's maximum number of positions.",
+          "category": "account-state",
+          "fixes": [
+            "Close an existing supply/collateral/borrow position in this pool before opening a new one."
+          ],
+          "status": "draft"
+        },
+        "1209": {
+          "code": 1209,
+          "name": "InternalReserveNotFound",
+          "summary": "The pool could not find a reserve it expected to have loaded.",
+          "category": "internal",
+          "fixes": [
+            "Confirm the asset is a reserve of this pool; otherwise report it with the transaction hash."
+          ],
+          "status": "draft"
+        },
+        "1210": {
+          "code": 1210,
+          "name": "InvalidPrice",
+          "summary": "The oracle price is stale or invalid.",
+          "explanation": "The oracle's last price is older than 24 hours or is zero/negative.",
+          "category": "oracle",
+          "fixes": [
+            "Wait for the oracle to update; nothing in the user's transaction can fix this."
+          ],
+          "status": "draft"
+        },
+        "1211": {
+          "code": 1211,
+          "name": "InvalidLiquidation",
+          "summary": "This position cannot be liquidated.",
+          "explanation": "The target is the pool or backstop itself, the percent is 0 or above 100, or the user's collateral still exceeds their liabilities.",
+          "category": "user-input",
+          "fixes": [
+            "Re-check the position's health and use a liquidation percent between 1 and 100."
+          ],
+          "status": "draft"
+        },
+        "1212": {
+          "code": 1212,
+          "name": "AuctionInProgress",
+          "summary": "An auction is already running for this user or the backstop.",
+          "category": "protocol-state",
+          "fixes": [
+            "Fill or wait for the existing auction instead of creating a new one."
+          ],
+          "status": "draft"
+        },
+        "1213": {
+          "code": 1213,
+          "name": "InvalidLiqTooLarge",
+          "summary": "The liquidation would take too much: post-liquidation health would exceed 1.15.",
+          "category": "user-input",
+          "fixes": [
+            "Lower the liquidation percent."
+          ],
+          "status": "draft"
+        },
+        "1214": {
+          "code": 1214,
+          "name": "InvalidLiqTooSmall",
+          "summary": "The liquidation is too small: post-liquidation health would stay under 1.03.",
+          "category": "user-input",
+          "fixes": [
+            "Raise the liquidation percent."
+          ],
+          "status": "draft"
+        },
+        "1215": {
+          "code": 1215,
+          "name": "InterestTooSmall",
+          "summary": "Accrued interest is below the minimum needed for an interest auction.",
+          "explanation": "Interest auctions require at least about 200 USDC worth of accrued backstop interest.",
+          "category": "protocol-state",
+          "fixes": [
+            "Wait until more interest has accrued."
+          ],
+          "status": "draft"
+        },
+        "1216": {
+          "code": 1216,
+          "name": "InvalidBTokenMintAmount",
+          "summary": "The supply amount rounds to zero bTokens.",
+          "category": "user-input",
+          "fixes": [
+            "Supply a larger amount."
+          ],
+          "status": "draft"
+        },
+        "1217": {
+          "code": 1217,
+          "name": "InvalidBTokenBurnAmount",
+          "summary": "The withdraw amount rounds to zero bTokens.",
+          "category": "user-input",
+          "fixes": [
+            "Withdraw a larger amount."
+          ],
+          "status": "draft"
+        },
+        "1218": {
+          "code": 1218,
+          "name": "InvalidDTokenMintAmount",
+          "summary": "The borrow amount rounds to zero dTokens.",
+          "category": "user-input",
+          "fixes": [
+            "Borrow a larger amount."
+          ],
+          "status": "draft"
+        },
+        "1219": {
+          "code": 1219,
+          "name": "InvalidDTokenBurnAmount",
+          "summary": "The repay amount rounds to zero dTokens.",
+          "category": "user-input",
+          "fixes": [
+            "Repay a larger amount."
+          ],
+          "status": "draft"
+        },
+        "1220": {
+          "code": 1220,
+          "name": "ExceededSupplyCap",
+          "summary": "This deposit would exceed the reserve's supply cap.",
+          "category": "protocol-state",
+          "fixes": [
+            "Supply less, or wait for withdrawals to free room under the cap."
+          ],
+          "status": "draft"
+        },
+        "1221": {
+          "code": 1221,
+          "name": "InvalidBid",
+          "summary": "The auction bid side is empty or not a valid liability.",
+          "category": "user-input",
+          "fixes": [
+            "Include at least one asset the user actually owes in the auction bid."
+          ],
+          "status": "draft"
+        },
+        "1222": {
+          "code": 1222,
+          "name": "InvalidLot",
+          "summary": "The auction lot side is empty or invalid.",
+          "explanation": "The lot must contain collateral the user holds; for interest auctions it must be exactly the backstop token.",
+          "category": "user-input",
+          "fixes": [
+            "Include valid collateral (or only the backstop token) in the lot."
+          ],
+          "status": "draft"
+        },
+        "1223": {
+          "code": 1223,
+          "name": "ReserveDisabled",
+          "summary": "This reserve is disabled for new supply and borrowing.",
+          "category": "protocol-state",
+          "fixes": [
+            "Use another reserve; repaying and withdrawing from this one still works."
+          ],
+          "status": "draft"
+        },
+        "1224": {
+          "code": 1224,
+          "name": "MinCollateralNotMet",
+          "summary": "Collateral is below the pool's minimum for borrowing.",
+          "explanation": "The position is healthy, but its total collateral value is below the pool's min_collateral setting.",
+          "category": "account-state",
+          "fixes": [
+            "Add more collateral before borrowing."
+          ],
+          "status": "draft"
+        }
+      }
+    },
+    "stellar/sac": {
+      "protocol": {
+        "id": "stellar",
+        "name": "Stellar built-in contracts",
+        "website": "https://developers.stellar.org"
+      },
+      "contract": {
+        "id": "sac",
+        "name": "Stellar Asset Contract (SAC)",
+        "notes": "Built into the Soroban host, so every classic asset and native XLM share this error set. Many protocols (e.g. Blend) reuse these low codes on purpose, so always check which contract emitted the error before using this file."
+      },
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "path": "soroban-env-host/src/builtin_contracts/contract_error.rs",
+        "commit": "0c99950e96128beba3319aa96b116646ce974e69",
+        "enum": "ContractError"
+      },
+      "errors": {
+        "2": {
+          "code": 2,
+          "name": "OperationNotSupportedError",
+          "summary": "This token does not support the operation you called.",
+          "explanation": "The asset contract recognised the function but refuses it for this asset or address type.",
+          "category": "user-input",
+          "common_causes": [
+            "Calling an admin-style function such as mint or set_admin on the native XLM contract."
+          ],
+          "fixes": [
+            "Check whether the operation makes sense for this asset; native XLM has no issuer-controlled functions."
+          ],
+          "status": "draft"
+        },
+        "3": {
+          "code": 3,
+          "name": "AlreadyInitializedError",
+          "summary": "The asset contract has already been initialised.",
+          "explanation": "Initialisation runs once per asset contract; a second attempt is rejected.",
+          "category": "protocol-state",
+          "fixes": [
+            "Skip initialisation and use the existing contract ID for this asset."
+          ],
+          "status": "draft"
+        },
+        "4": {
+          "code": 4,
+          "name": "UnauthorizedError",
+          "summary": "The caller is not allowed to perform this asset operation.",
+          "explanation": "An admin-only function (for example mint, clawback or set_authorized) was invoked by an address that is not the asset admin, or the asset is not configured to allow it.",
+          "category": "permissions",
+          "common_causes": [
+            "Minting from an account other than the issuer/admin.",
+            "Clawback on an asset without clawback enabled."
+          ],
+          "fixes": [
+            "Sign with the asset admin, or confirm the asset flags allow the operation."
+          ],
+          "status": "draft"
+        },
+        "5": {
+          "code": 5,
+          "name": "AuthenticationError",
+          "summary": "Authorization for this asset operation failed.",
+          "category": "permissions",
+          "fixes": [
+            "Re-simulate the transaction so the auth entries are regenerated, then sign with the correct account."
+          ],
+          "status": "draft"
+        },
+        "6": {
+          "code": 6,
+          "name": "AccountMissingError",
+          "summary": "The account does not exist on the ledger.",
+          "explanation": "A classic G-address involved in the transfer has never been funded, so there is no account entry to hold or receive the asset.",
+          "category": "account-state",
+          "common_causes": [
+            "Sending to a fresh testnet address that was never funded via Friendbot."
+          ],
+          "fixes": [
+            "Create and fund the account first (CreateAccount, or Friendbot on testnet)."
+          ],
+          "references": [
+            {
+              "title": "Stellar CLI agent guide — check balances",
+              "url": "https://developers.stellar.org/docs/tools/cli/agent-cli/guides/check-balances-and-metadata"
+            }
+          ],
+          "status": "draft"
+        },
+        "7": {
+          "code": 7,
+          "name": "AccountIsNotClassic",
+          "summary": "This operation needs a classic G-account, not a contract address.",
+          "category": "user-input",
+          "fixes": [
+            "Pass a G... account address for this argument."
+          ],
+          "status": "draft"
+        },
+        "8": {
+          "code": 8,
+          "name": "NegativeAmountError",
+          "summary": "A negative amount was passed to the token.",
+          "category": "user-input",
+          "common_causes": [
+            "A sign or decimal-scaling bug in client code."
+          ],
+          "fixes": [
+            "Pass a non-negative i128 in the token's smallest unit (7 decimals for classic assets)."
+          ],
+          "status": "draft"
+        },
+        "9": {
+          "code": 9,
+          "name": "AllowanceError",
+          "summary": "The spender's allowance is too low or has expired.",
+          "explanation": "transfer_from or burn_from tried to move more than the approved allowance, or the approval's expiration ledger has passed.",
+          "category": "account-state",
+          "common_causes": [
+            "approve() was called with an expiration_ledger that is now in the past.",
+            "A DEX or vault pulls more than the user approved."
+          ],
+          "fixes": [
+            "Call approve() again with a sufficient amount and a later expiration_ledger."
+          ],
+          "status": "draft"
+        },
+        "10": {
+          "code": 10,
+          "name": "BalanceError",
+          "summary": "Insufficient balance, or the result would break the balance limits.",
+          "explanation": "The sender does not hold enough of the asset, or the receiver's trustline limit would be exceeded.",
+          "category": "account-state",
+          "common_causes": [
+            "Amount not scaled to the asset's decimals.",
+            "Classic XLM balance blocked by minimum reserve.",
+            "Receiver trustline limit too low."
+          ],
+          "fixes": [
+            "Check the sender's balance with the token's balance() function.",
+            "Raise the receiver's trustline limit if the receiver is the problem."
+          ],
+          "status": "draft"
+        },
+        "11": {
+          "code": 11,
+          "name": "BalanceDeauthorizedError",
+          "summary": "The balance is frozen: the issuer has not authorised this holder.",
+          "explanation": "The asset requires authorisation and the trustline or contract balance involved is not authorised (or was revoked).",
+          "category": "account-state",
+          "fixes": [
+            "Ask the issuer to authorise the trustline (SetTrustLineFlags) or the contract balance (set_authorized)."
+          ],
+          "status": "draft"
+        },
+        "12": {
+          "code": 12,
+          "name": "OverflowError",
+          "summary": "An amount calculation overflowed.",
+          "category": "user-input",
+          "fixes": [
+            "Check for absurdly large amounts, usually from scaling an already-scaled value."
+          ],
+          "status": "draft"
+        },
+        "13": {
+          "code": 13,
+          "name": "TrustlineMissingError",
+          "summary": "The account has no trustline for this asset.",
+          "explanation": "Classic accounts must opt in to every non-native asset before they can hold it. The sender or the receiver has no trustline for this asset.",
+          "category": "account-state",
+          "common_causes": [
+            "Receiving USDC (or any issued asset) on an account that never added the trustline.",
+            "A swap whose output asset the user has not trusted yet."
+          ],
+          "fixes": [
+            "Add a ChangeTrust operation for the asset before the payment or swap, ideally in the same transaction."
+          ],
+          "references": [
+            {
+              "title": "Stellar docs — Verify trustlines",
+              "url": "https://developers.stellar.org/docs/build/guides/basics/verify-trustlines"
+            }
+          ],
+          "status": "draft"
+        },
+        "14": {
+          "code": 14,
+          "name": "InsufficientAccountReserve",
+          "summary": "The account lacks the XLM reserve needed for this change.",
+          "explanation": "Creating a new ledger entry for a classic account (for example a trustline) raises its minimum XLM balance, and the account cannot cover it.",
+          "category": "account-state",
+          "fixes": [
+            "Fund the account with more XLM, or remove unused trustlines/offers to free reserve."
+          ],
+          "status": "draft"
+        },
+        "15": {
+          "code": 15,
+          "name": "TooManyAccountSubentries",
+          "summary": "The account has hit the maximum number of subentries.",
+          "category": "account-state",
+          "fixes": [
+            "Remove unused trustlines, offers, signers or data entries from the account."
+          ],
+          "status": "draft"
+        }
+      }
+    }
+  },
+  "byContractId": {},
+  "byWasmHash": {}
+}
