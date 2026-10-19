@@ -62,8 +62,9 @@ Publish on tag, attach `dist/registry.json` to the GitHub release, and document 
 
 ## High
 
-### 17. `soroban-explain tx <hash>`
+### 17. `soroban-explain tx <hash>` (closed)
 Fetch a failed transaction from Stellar RPC, find the first `error` diagnostic event and the contract that emitted it, read that contract's wasm hash from its instance entry, and explain every error in the chain, including wrapped ones like `Error(Auth, InvalidAction)` → `Error(Contract, #5)`. Keep it in a separate optional entry point so the core library stays dependency-free.
+**Closed:** shipped as `soroban-explain tx` and the `soroban-error-registry/tx` entry point (`src/tx.mjs`), tested against a recorded testnet transaction in `test/fixtures/`.
 
 ### 18. Generate skeleton files from a deployed wasm
 `npm run scaffold -- <contract-id> --network mainnet` should fetch the contract's wasm, read the `contractspecv0` section, and write a draft registry file with every error name, code and doc comment filled in. A human then writes the explanations.

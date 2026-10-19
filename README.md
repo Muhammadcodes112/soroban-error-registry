@@ -48,6 +48,20 @@ npx soroban-explain a41fc53d6753b6c04eb15b021c55052366a4c8e0e21bc72700f461264ec1
 npx soroban-explain --list
 ```
 
+**Explain a failed transaction**: fetches it from Stellar RPC and explains every `error` diagnostic event in order, starting with the root cause. Needs `@stellar/stellar-sdk` installed alongside this package.
+```bash
+npx -p soroban-error-registry -p @stellar/stellar-sdk soroban-explain tx <hash>          # testnet
+npx -p soroban-error-registry -p @stellar/stellar-sdk soroban-explain tx <hash> --network mainnet --rpc <url>
+```
+Testnet defaults to `https://soroban-testnet.stellar.org`. Mainnet has no public default, so pass `--rpc` or set `SOROBAN_RPC_URL`. Each error is matched by the contract ID that emitted it, then by the wasm hash in its instance entry (Stellar Asset Contracts map to `stellar/sac`). When a contract isn't in the registry, it says so rather than guessing from another contract's codes.
+
+```js
+import { explainTx, RPC_URLS } from "soroban-error-registry/tx";   // optional entry point; needs @stellar/stellar-sdk
+
+const { status, errors } = await explainTx(hash, { rpcUrl: RPC_URLS.testnet });
+// errors[0] is the root cause: { error: "Error(Contract, #5)", contractId, message, key: "stellar/sac", hit: { name: "AuthenticationError", ... } }
+```
+
 **Library**: no dependencies, works in browsers, bundlers, Deno, Bun and Node.
 ```js
 import { explain } from "soroban-error-registry";
