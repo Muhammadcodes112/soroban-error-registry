@@ -16,7 +16,7 @@
       "source": {
         "repo": "https://github.com/blend-capital/blend-contracts-v2",
         "path": "backstop/src/errors.rs",
-        "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+        "commit": "c19abee5b9be4f49e0cda9057e87d343e5dcc095",
         "enum": "BackstopError"
       },
       "errors": {
@@ -231,7 +231,7 @@
       "source": {
         "repo": "https://github.com/blend-capital/blend-contracts-v2",
         "path": "pool-factory/src/errors.rs",
-        "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+        "commit": "c19abee5b9be4f49e0cda9057e87d343e5dcc095",
         "enum": "PoolFactoryError"
       },
       "errors": {
@@ -286,7 +286,7 @@
       "source": {
         "repo": "https://github.com/blend-capital/blend-contracts-v2",
         "path": "pool/src/errors.rs",
-        "commit": "ba22b487b2c5057a4ecc28b05b5193c28e4bd117",
+        "commit": "c19abee5b9be4f49e0cda9057e87d343e5dcc095",
         "enum": "PoolError"
       },
       "errors": {
@@ -638,82 +638,102 @@
       },
       "contract": {
         "id": "sac",
-        "name": "Stellar Asset Contract (SAC)",
-        "notes": "Built into the Soroban host, so every classic asset and native XLM share this error set. Many protocols (e.g. Blend) reuse these low codes on purpose, so always check which contract emitted the error before using this file."
+        "name": "Stellar Asset Contract (SAC) and built-in account auth",
+        "version": "protocol-28",
+        "notes": "All built-in contracts share one error enum. Most codes come from the Stellar Asset Contract (every classic asset and native XLM), but #5 comes from the built-in classic-account signature check, so it can appear in any call that needs a G-account's authorization. Admin-only SAC functions use require_auth(), so a wrong signer shows up as a host Auth error (see stellar/host), not as #4. Many protocols (e.g. Blend) reuse these low codes, so always check which contract emitted the error."
       },
       "source": {
         "repo": "https://github.com/stellar/rs-soroban-env",
         "path": "soroban-env-host/src/builtin_contracts/contract_error.rs",
-        "commit": "0c99950e96128beba3319aa96b116646ce974e69",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
         "enum": "ContractError"
       },
       "errors": {
         "2": {
           "code": 2,
           "name": "OperationNotSupportedError",
-          "summary": "This token does not support the operation you called.",
-          "explanation": "The asset contract recognised the function but refuses it for this asset or address type.",
+          "summary": "This asset or account does not support the operation you called.",
+          "explanation": "The SAC refuses the call for this asset or address. Host messages include \"operation invalid on native asset\", \"cannot clawback native asset\", \"cannot clawback from issuer\", \"issuer does not have AUTH_REVOCABLE set\", \"issuer doesn't have a trustline\" and \"trust operation is not supported for native asset\".",
           "category": "user-input",
           "common_causes": [
-            "Calling an admin-style function such as mint or set_admin on the native XLM contract."
+            "Calling burn, burn_from, clawback, set_authorized or trust on the native XLM contract.",
+            "Revoking authorization (set_authorized false) on an asset whose issuer did not set AUTH_REVOCABLE.",
+            "Targeting the issuer account itself with clawback, set_authorized or trust."
           ],
           "fixes": [
-            "Check whether the operation makes sense for this asset; native XLM has no issuer-controlled functions."
+            "Read the diagnostic event message to see which rule was hit.",
+            "Use a non-native asset for issuer-controlled operations, and never target the issuer account.",
+            "Set AUTH_REVOCABLE on the issuer before trying to revoke authorization."
           ],
           "status": "draft"
         },
         "3": {
           "code": 3,
           "name": "AlreadyInitializedError",
-          "summary": "The asset contract has already been initialised.",
-          "explanation": "Initialisation runs once per asset contract; a second attempt is rejected.",
+          "summary": "A Stellar Asset Contract already exists for this asset.",
+          "explanation": "Host message: \"StellarAssetContract has been already initialized\". Each classic asset has exactly one SAC, at a deterministic contract ID.",
           "category": "protocol-state",
+          "common_causes": [
+            "Deploying the SAC for an asset (e.g. stellar contract asset deploy) that someone already deployed."
+          ],
           "fixes": [
-            "Skip initialisation and use the existing contract ID for this asset."
+            "Use the existing contract ID: `stellar contract id asset --asset CODE:ISSUER` prints it."
           ],
           "status": "draft"
         },
         "4": {
           "code": 4,
           "name": "UnauthorizedError",
-          "summary": "The caller is not allowed to perform this asset operation.",
-          "explanation": "An admin-only function (for example mint, clawback or set_authorized) was invoked by an address that is not the asset admin, or the asset is not configured to allow it.",
+          "summary": "Declared but never raised by the built-in contracts in protocol 28.",
+          "explanation": "Admin checks use require_auth(), so a wrong admin signer fails with a host Auth error, e.g. Error(Auth, InvalidAction), rather than this code. An Error(Contract, #4) almost certainly comes from a custom contract that reuses the number.",
           "category": "permissions",
-          "common_causes": [
-            "Minting from an account other than the issuer/admin.",
-            "Clawback on an asset without clawback enabled."
-          ],
+          "raised_in_source": false,
           "fixes": [
-            "Sign with the asset admin, or confirm the asset flags allow the operation."
+            "Check which contract emitted the error; look it up under that contract instead."
           ],
-          "status": "draft"
+          "status": "draft",
+          "see_also": [
+            "stellar/host#Auth,InvalidAction"
+          ]
         },
         "5": {
           "code": 5,
           "name": "AuthenticationError",
-          "summary": "Authorization for this asset operation failed.",
+          "summary": "The classic account's signatures did not satisfy its signing rules.",
+          "explanation": "Raised by the built-in classic-account auth check, not the token. Host messages: \"no account signatures found\", \"too many account signers\", \"public keys are not ordered\", \"signer does not belong to account\" and \"signature weight is lower than threshold\". The host then wraps it, so the transaction's top-level error is usually Error(Auth, InvalidAction) (\"failed account authentication with error\"), and this code appears in the diagnostic events just before it.",
           "category": "permissions",
-          "fixes": [
-            "Re-simulate the transaction so the auth entries are regenerated, then sign with the correct account."
+          "common_causes": [
+            "Multisig account where the collected signatures do not reach the medium threshold.",
+            "Signing the auth entry with a key that is not a signer on the account.",
+            "Hand-built auth entries with signatures not sorted by public key."
           ],
-          "status": "draft"
+          "fixes": [
+            "Check the account's signers and thresholds on an explorer and sign with enough weight.",
+            "Let the SDK build and sort the auth entry signatures (e.g. authorizeEntry in stellar-sdk) instead of assembling them by hand."
+          ],
+          "status": "draft",
+          "see_also": [
+            "stellar/host#Auth,InvalidAction"
+          ]
         },
         "6": {
           "code": 6,
           "name": "AccountMissingError",
           "summary": "The account does not exist on the ledger.",
-          "explanation": "A classic G-address involved in the transfer has never been funded, so there is no account entry to hold or receive the asset.",
+          "explanation": "Host message: \"account entry is missing\". Since protocol 26 (CAP-73), an XLM transfer to a new G-address creates the account if it sends at least 2 base reserves. This error remains for spending from, or creating a trustline for, an account that does not exist.",
           "category": "account-state",
           "common_causes": [
-            "Sending to a fresh testnet address that was never funded via Friendbot."
+            "Spending from, or calling trust for, a G-address that was never funded.",
+            "Using a testnet address on mainnet (or the reverse)."
           ],
           "fixes": [
-            "Create and fund the account first (CreateAccount, or Friendbot on testnet)."
+            "Fund the account first (an XLM transfer of at least 2 base reserves, CreateAccount, or Friendbot on testnet).",
+            "Check that you are on the right network."
           ],
           "references": [
             {
-              "title": "Stellar CLI agent guide — check balances",
-              "url": "https://developers.stellar.org/docs/tools/cli/agent-cli/guides/check-balances-and-metadata"
+              "title": "Stellar Yardstick (Protocol 26) upgrade guide",
+              "url": "https://stellar.org/blog/foundation-news/stellar-yardstick-protocol-26-upgrade-guide"
             }
           ],
           "status": "draft"
@@ -721,10 +741,11 @@
         "7": {
           "code": 7,
           "name": "AccountIsNotClassic",
-          "summary": "This operation needs a classic G-account, not a contract address.",
+          "summary": "Declared but never raised by the built-in contracts in protocol 28.",
           "category": "user-input",
+          "raised_in_source": false,
           "fixes": [
-            "Pass a G... account address for this argument."
+            "Check which contract emitted the error; look it up under that contract instead."
           ],
           "status": "draft"
         },
@@ -732,6 +753,7 @@
           "code": 8,
           "name": "NegativeAmountError",
           "summary": "A negative amount was passed to the token.",
+          "explanation": "Host message: \"negative amount is not allowed\". Every amount-taking SAC function (transfer, approve, mint, burn, clawback ...) checks this first.",
           "category": "user-input",
           "common_causes": [
             "A sign or decimal-scaling bug in client code."
@@ -744,32 +766,36 @@
         "9": {
           "code": 9,
           "name": "AllowanceError",
-          "summary": "The spender's allowance is too low or has expired.",
-          "explanation": "transfer_from or burn_from tried to move more than the approved allowance, or the approval's expiration ledger has passed.",
+          "summary": "The allowance is too low, or the approval's expiry ledger is invalid.",
+          "explanation": "Host messages: \"not enough allowance to spend\" (transfer_from/burn_from), \"live_until must be >= ledger sequence\" and \"live_until is greater than max_live_until_ledger\" (approve).",
           "category": "account-state",
           "common_causes": [
-            "approve() was called with an expiration_ledger that is now in the past.",
+            "The approval expired: its live_until ledger has passed, so the allowance is effectively 0.",
+            "approve() called with a live_until ledger in the past, or too far in the future.",
             "A DEX or vault pulls more than the user approved."
           ],
           "fixes": [
-            "Call approve() again with a sufficient amount and a later expiration_ledger."
+            "Call approve() again with enough amount and a live_until between the current ledger and the network's max TTL.",
+            "Check the current allowance with allowance(from, spender) before transfer_from."
           ],
           "status": "draft"
         },
         "10": {
           "code": 10,
           "name": "BalanceError",
-          "summary": "Insufficient balance, or the result would break the balance limits.",
-          "explanation": "The sender does not hold enough of the asset, or the receiver's trustline limit would be exceeded.",
+          "summary": "Insufficient balance, or the new balance would break the account's limits.",
+          "explanation": "Host messages: \"balance is not sufficient to spend\" and \"zero balance is not sufficient to spend\" (sender too poor); \"resulting balance is not within the allowed range\" (a classic account or trustline would drop below its reserve or selling liabilities, or rise above the trustline limit or buying liabilities); and, for clawback, \"trustline isn't clawbackable\", \"balance isn't clawbackable\" and \"no balance to clawback\".",
           "category": "account-state",
           "common_causes": [
-            "Amount not scaled to the asset's decimals.",
-            "Classic XLM balance blocked by minimum reserve.",
-            "Receiver trustline limit too low."
+            "Amount not scaled to the asset's 7 decimals.",
+            "Sending XLM that is locked in the account's minimum reserve or open offers.",
+            "Receiver's trustline limit is too low.",
+            "Clawback on a trustline or balance created before clawback was enabled."
           ],
           "fixes": [
-            "Check the sender's balance with the token's balance() function.",
-            "Raise the receiver's trustline limit if the receiver is the problem."
+            "Check the sender's spendable balance (balance() for contracts; balance minus reserve and liabilities for G-accounts).",
+            "Raise the receiver's trustline limit.",
+            "For clawback, confirm the trustline has the clawback flag."
           ],
           "status": "draft"
         },
@@ -777,17 +803,18 @@
           "code": 11,
           "name": "BalanceDeauthorizedError",
           "summary": "The balance is frozen: the issuer has not authorised this holder.",
-          "explanation": "The asset requires authorisation and the trustline or contract balance involved is not authorised (or was revoked).",
+          "explanation": "Host message: \"balance is deauthorized\". Raised when the sender or receiver is not authorised for an asset that requires authorisation, or whose authorisation was revoked. Contract balances on an AUTH_REQUIRED asset start unauthorised.",
           "category": "account-state",
           "fixes": [
-            "Ask the issuer to authorise the trustline (SetTrustLineFlags) or the contract balance (set_authorized)."
+            "Ask the issuer to authorise the trustline (SetTrustLineFlags) or the contract address (SAC set_authorized)."
           ],
           "status": "draft"
         },
         "12": {
           "code": 12,
           "name": "OverflowError",
-          "summary": "An amount calculation overflowed.",
+          "summary": "An amount does not fit in the balance type.",
+          "explanation": "Host messages include \"received amount is too large for an i64\", \"spent amount is too large for an i64\" (classic balances are i64), \"balance overflow in receive_balance\" and \"allowance overflowed\".",
           "category": "user-input",
           "fixes": [
             "Check for absurdly large amounts, usually from scaling an already-scaled value."
@@ -798,14 +825,14 @@
           "code": 13,
           "name": "TrustlineMissingError",
           "summary": "The account has no trustline for this asset.",
-          "explanation": "Classic accounts must opt in to every non-native asset before they can hold it. The sender or the receiver has no trustline for this asset.",
+          "explanation": "Host message: \"trustline entry is missing for account\". Classic accounts must opt in to every non-native asset before they can hold it.",
           "category": "account-state",
           "common_causes": [
             "Receiving USDC (or any issued asset) on an account that never added the trustline.",
             "A swap whose output asset the user has not trusted yet."
           ],
           "fixes": [
-            "Add a ChangeTrust operation for the asset before the payment or swap, ideally in the same transaction."
+            "Add a ChangeTrust operation before the payment or swap, or call the SAC's trust(address) function (protocol 26+), which needs the account's authorization."
           ],
           "references": [
             {
@@ -818,18 +845,20 @@
         "14": {
           "code": 14,
           "name": "InsufficientAccountReserve",
-          "summary": "The account lacks the XLM reserve needed for this change.",
-          "explanation": "Creating a new ledger entry for a classic account (for example a trustline) raises its minimum XLM balance, and the account cannot cover it.",
+          "summary": "Not enough XLM to cover the reserve for a new account or trustline.",
+          "explanation": "Host messages: \"transfer amount is below minimum balance for new account\" (an XLM transfer that would create a new account sent less than 2 base reserves) and \"account has insufficient reserve for new trustline\" (trust() needs one more base reserve).",
           "category": "account-state",
           "fixes": [
-            "Fund the account with more XLM, or remove unused trustlines/offers to free reserve."
+            "Send at least 2 base reserves of XLM when funding a new account.",
+            "Top up the account's XLM, or remove unused trustlines or offers to free reserve, before calling trust()."
           ],
           "status": "draft"
         },
         "15": {
           "code": 15,
           "name": "TooManyAccountSubentries",
-          "summary": "The account has hit the maximum number of subentries.",
+          "summary": "The account has hit the 1,000 subentry limit.",
+          "explanation": "Host message: \"account has reached maximum number of sub-entries\". Raised when trust() would add one more trustline.",
           "category": "account-state",
           "fixes": [
             "Remove unused trustlines, offers, signers or data entries from the account."
@@ -839,6 +868,489 @@
       }
     }
   },
-  "byContractId": {},
-  "byWasmHash": {}
+  "host": {
+    "Auth,ExistingValue": {
+      "type": "Auth",
+      "code": "ExistingValue",
+      "summary": "This signed authorization was already used (replayed nonce).",
+      "explanation": "Every signed auth entry carries a nonce that can only be consumed once.",
+      "messages": [
+        "nonce already exists for address"
+      ],
+      "category": "transaction-building",
+      "common_causes": [
+        "Resubmitting a transaction (or reusing auth entries) that already succeeded.",
+        "Copying signed auth entries from one transaction into another."
+      ],
+      "fixes": [
+        "Re-simulate to get fresh auth entries with a new nonce, then sign again."
+      ],
+      "source_files": [
+        "soroban-env-host/src/auth.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Auth,InvalidAction": {
+      "type": "Auth",
+      "code": "InvalidAction",
+      "summary": "A required authorization was missing or failed.",
+      "explanation": "\"Unauthorized function call for address\" means a contract called require_auth() (or require_auth_for_args) for an address, and the transaction had no matching signed auth entry. \"failed account authentication with error\" means a matching entry existed but the account rejected it. For a classic G-account, look for Error(Contract, #5) in the diagnostic events (see stellar/sac#5). For a smart wallet, it is that wallet's own __check_auth error.",
+      "messages": [
+        "Unauthorized function call for address",
+        "failed account authentication with error"
+      ],
+      "category": "permissions",
+      "common_causes": [
+        "The transaction was not re-simulated after its arguments changed, so the auth entry covers different arguments.",
+        "Signing with the wrong account, or not signing the auth entries at all (only the transaction envelope).",
+        "A contract calling another contract on its own behalf without authorize_as_current_contract().",
+        "A multisig or smart-wallet signer set that does not meet the account's rules."
+      ],
+      "fixes": [
+        "Simulate the exact final transaction and sign every returned auth entry for the address named in the event.",
+        "Read the next diagnostic event to see why the account rejected the signature."
+      ],
+      "source_files": [
+        "soroban-env-host/src/auth.rs"
+      ],
+      "references": [
+        {
+          "title": "Stellar docs — Authorization",
+          "url": "https://developers.stellar.org/docs/learn/fundamentals/contract-development/authorization"
+        }
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Auth,InvalidInput": {
+      "type": "Auth",
+      "code": "InvalidInput",
+      "summary": "The signed authorization has expired, or its expiry is too far ahead.",
+      "explanation": "Each signed auth entry has a signature expiration ledger. It must not have passed, and it must not be beyond the network's maximum TTL.",
+      "messages": [
+        "signature has expired",
+        "signature expiration is too late"
+      ],
+      "category": "transaction-building",
+      "common_causes": [
+        "The user took too long to sign, or the transaction was submitted long after signing.",
+        "Setting the expiration ledger far in the future by hand."
+      ],
+      "fixes": [
+        "Re-simulate and re-sign the auth entries with an expiration ledger a short way past the current ledger, then submit promptly."
+      ],
+      "source_files": [
+        "soroban-env-host/src/auth.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Budget,ExceededLimit": {
+      "type": "Budget",
+      "code": "ExceededLimit",
+      "summary": "The call ran out of CPU instructions or memory.",
+      "explanation": "The invocation used more CPU instructions or memory than the transaction declared, or than the network allows. Wasm stack overflow and running out of fuel map here too. This error cannot be caught by a calling contract.",
+      "category": "resources",
+      "common_causes": [
+        "Resources come from an old simulation, and the contract's state has since grown (larger vectors or maps to iterate).",
+        "Unbounded loops over storage, or storing large Vec/Map values in one key.",
+        "Heavy cryptography or deep recursion."
+      ],
+      "fixes": [
+        "Re-simulate right before submitting, and add a safety margin to the instruction limit.",
+        "If simulation itself fails here, the work exceeds network limits: paginate, split the work across transactions, or move large collections into separate storage keys.",
+        "Check current network limits with `stellar network settings`."
+      ],
+      "source_files": [
+        "soroban-env-host/src/budget/dimension.rs",
+        "soroban-env-common/src/error.rs"
+      ],
+      "references": [
+        {
+          "title": "Stellar docs — Resource limits & fees",
+          "url": "https://developers.stellar.org/docs/networks/resource-limits-fees"
+        }
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Context,ExceededLimit": {
+      "type": "Context",
+      "code": "ExceededLimit",
+      "summary": "Call depth or value nesting went past the host's limit.",
+      "explanation": "Raised when contract-to-contract calls (or recursion) nest too deeply, or when a value or XDR structure is too deep or too large to decode.",
+      "category": "contract-bug",
+      "common_causes": [
+        "Recursive cross-contract calls.",
+        "Deeply nested data structures passed as arguments."
+      ],
+      "fixes": [
+        "Flatten the call chain or the data structure."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/frame.rs",
+        "soroban-env-common/src/error.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Context,InvalidAction": {
+      "type": "Context",
+      "code": "InvalidAction",
+      "summary": "The call pattern is not allowed: re-entry, a reserved function, or a failed constructor.",
+      "messages": [
+        "Contract re-entry is not allowed",
+        "can't invoke a reserved function directly",
+        "constructor invocation has failed with error"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "Contract A calls B, and B calls back into A in the same invocation.",
+        "Calling __constructor or __check_auth directly.",
+        "A deploy whose constructor panicked; the next diagnostic event holds the constructor's own error."
+      ],
+      "fixes": [
+        "Restructure so callbacks into the original contract are not needed.",
+        "For constructors, look up the inner error emitted just before this one."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/frame.rs",
+        "soroban-env-host/src/host/lifecycle.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Crypto,InvalidInput": {
+      "type": "Crypto",
+      "code": "InvalidInput",
+      "summary": "A signature or cryptographic input failed verification.",
+      "explanation": "Raised by host crypto functions such as ed25519_verify and secp256r1_verify (passkeys), and by BLS12-381 or BN254 operations given invalid input. In smart wallets this usually means the signature does not match the payload being authorized.",
+      "messages": [
+        "failed ED25519 verification",
+        "failed secp256r1 verification",
+        "ECDSA signature 's' part is not normalized to low form",
+        "invalid ed25519 public key"
+      ],
+      "category": "permissions",
+      "common_causes": [
+        "Signing a different payload than the contract verifies (e.g. the wrong auth-entry preimage or network passphrase).",
+        "Passkey (secp256r1) signatures not in 64-byte compact form, or with a high 's' value that was not normalised to low-S.",
+        "Using the wrong public key for the signer."
+      ],
+      "fixes": [
+        "Recompute the signed payload exactly as the contract does, including the network passphrase.",
+        "Normalise secp256r1 signatures to compact low-S form before sending."
+      ],
+      "source_files": [
+        "soroban-env-host/src/crypto/mod.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Object,IndexBounds": {
+      "type": "Object",
+      "code": "IndexBounds",
+      "summary": "A Vec or Bytes index was out of range.",
+      "explanation": "The contract used an unchecked or panicking accessor on a host object with an index past its end.",
+      "messages": [
+        "object index out of bounds",
+        "bytes_get out of bounds"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "Vec::get_unchecked, Bytes::get_unchecked or a slice call on an empty or shorter-than-expected collection."
+      ],
+      "fixes": [
+        "Use the checked get(), which returns an Option, and handle the empty case, or check len() first."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/error.rs",
+        "soroban-env-host/src/host.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Object,MissingValue": {
+      "type": "Object",
+      "code": "MissingValue",
+      "summary": "A Map key the contract required is not in the map.",
+      "messages": [
+        "map key not found in map_get",
+        "map key not found in map_del"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "Map::get_unchecked or remove_unchecked for a key that is not present."
+      ],
+      "fixes": [
+        "Use Map::get(), which returns an Option, and handle the missing case."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Storage,ExceededLimit": {
+      "type": "Storage",
+      "code": "ExceededLimit",
+      "summary": "The contract touched a ledger entry that is not in the transaction's footprint.",
+      "explanation": "Every Soroban transaction lists up front which ledger entries it may read or write. Accessing anything else, or writing an entry listed as read-only, fails here. The message names the kind of key (contract data key, contract instance, account trustline, ...). This error cannot be caught by a calling contract.",
+      "messages": [
+        "trying to access {} outside of the footprint",
+        "trying to access nonce outside of footprint for address"
+      ],
+      "category": "transaction-building",
+      "common_causes": [
+        "Submitting without simulating, or with a hand-built footprint.",
+        "State changed between simulation and submission, so the contract now reads a different key (e.g. a new user, an oracle round, or a different pool position).",
+        "Changing the arguments after simulating."
+      ],
+      "fixes": [
+        "Simulate and assemble the transaction (e.g. rpc.prepareTransaction) right before signing.",
+        "If state moves fast, re-simulate and retry automatically on this error."
+      ],
+      "source_files": [
+        "soroban-env-host/src/storage.rs",
+        "soroban-env-host/src/auth.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Storage,ExistingValue": {
+      "type": "Storage",
+      "code": "ExistingValue",
+      "summary": "A contract already exists at this address.",
+      "explanation": "Contract addresses are derived from the deployer and a salt, so deploying again with the same pair targets an address that is taken.",
+      "messages": [
+        "contract already exists"
+      ],
+      "category": "user-input",
+      "fixes": [
+        "Deploy with a different salt, or use the existing contract."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/lifecycle.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Storage,InvalidAction": {
+      "type": "Storage",
+      "code": "InvalidAction",
+      "summary": "The storage operation is not allowed for this kind of entry.",
+      "messages": [
+        "trying to extend temporary entry past max TTL allowed by network: {} > {}",
+        "instance storage should be extended via `extend_current_contract_instance_and_code_ttl` function only"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "Calling extend_ttl on a temporary entry with extend_to above the network's max TTL.",
+        "Extending instance storage through the generic data-TTL path instead of env.storage().instance().extend_ttl()."
+      ],
+      "fixes": [
+        "Cap TTL extensions at the network max, and use the instance-specific extend function for instance storage."
+      ],
+      "source_files": [
+        "soroban-env-host/src/storage.rs",
+        "soroban-env-host/src/host.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Storage,MissingValue": {
+      "type": "Storage",
+      "code": "MissingValue",
+      "summary": "The contract read a storage entry that does not exist.",
+      "explanation": "The message names what was missing. A missing \"contract instance\" usually means the contract ID does not exist on this network. A missing \"contract data key\" means the contract read a key that was never written, or a temporary entry that expired and was deleted.",
+      "messages": [
+        "trying to get non-existing value for {}",
+        "key is missing from instance storage"
+      ],
+      "category": "protocol-state",
+      "common_causes": [
+        "Calling a contract ID from another network (testnet ID on mainnet), or a contract that was never deployed.",
+        "The contract reads config that was never initialised (e.g. an init or constructor step was skipped).",
+        "A temporary entry such as a lock, allowance or cache expired."
+      ],
+      "fixes": [
+        "Check the contract ID and network.",
+        "Make sure required setup or initialisation ran.",
+        "In contract code, use storage().get(), which returns an Option, or has() for keys that may be absent."
+      ],
+      "source_files": [
+        "soroban-env-host/src/storage.rs",
+        "soroban-env-host/src/host.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "Value,ExceededLimit": {
+      "type": "Value",
+      "code": "ExceededLimit",
+      "summary": "The Wasm code is too large to upload.",
+      "messages": [
+        "Wasm code is too large"
+      ],
+      "category": "resources",
+      "fixes": [
+        "Build with `stellar contract build` (release profile, opt-level \"z\", lto) and run `stellar contract optimize`.",
+        "Split the contract or drop unused dependencies."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/lifecycle.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "WasmVm,InvalidAction": {
+      "type": "WasmVm",
+      "code": "InvalidAction",
+      "summary": "The contract trapped — usually a Rust panic in contract code.",
+      "explanation": "A Wasm `unreachable` trap maps to this error, and that is what a Rust panic compiles to: unwrap() or expect() on None/Err, panic!(), an out-of-bounds slice index, or arithmetic overflow with overflow-checks on. Contracts that return a #[contracterror] value show Error(Contract, #N) instead, so this means the failure had no named error. It is also raised when the Wasm calls a host function the current protocol does not support.",
+      "messages": [
+        "contract calls a host function not yet supported by current protocol",
+        "contract calls a host function no longer supported in the current protocol"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "unwrap() on a storage read or a conversion that failed.",
+        "Integer overflow in release builds with overflow-checks = true.",
+        "A contract built with a newer soroban-sdk than the network's protocol supports."
+      ],
+      "fixes": [
+        "Check the diagnostic events for the panic message or log() output just before the trap.",
+        "Reproduce in a unit test with soroban-sdk testutils to get the panic location.",
+        "Replace panics with panic_with_error!/Result and a #[contracterror] enum so callers see a meaningful code.",
+        "Match the soroban-sdk major version to the network protocol."
+      ],
+      "source_files": [
+        "soroban-env-common/src/error.rs",
+        "soroban-env-host/src/vm/parsed_module.rs"
+      ],
+      "references": [
+        {
+          "title": "Stellar docs — Debugging errors",
+          "url": "https://developers.stellar.org/docs/learn/fundamentals/contract-development/errors-and-debugging/debugging-errors"
+        }
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    },
+    "WasmVm,MissingValue": {
+      "type": "WasmVm",
+      "code": "MissingValue",
+      "summary": "The function you called does not exist on this contract.",
+      "messages": [
+        "trying to invoke non-existent contract function"
+      ],
+      "category": "user-input",
+      "common_causes": [
+        "A typo in the function name.",
+        "Calling the right name on the wrong contract, or on an older deployed version that lacks the function.",
+        "Client bindings generated from a different contract version."
+      ],
+      "fixes": [
+        "List the deployed contract's functions with `stellar contract info interface --id <C...>` and compare.",
+        "Regenerate client bindings from the deployed contract."
+      ],
+      "source_files": [
+        "soroban-env-host/src/vm.rs"
+      ],
+      "status": "draft",
+      "source": {
+        "repo": "https://github.com/stellar/rs-soroban-env",
+        "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+        "tag": "v28.0.2"
+      },
+      "network_protocol": 28
+    }
+  },
+  "byContractId": {
+    "CAQQR5SWBXKIGZKPBZDH3KM5GQ5GUTPKB7JAFCINLZBC5WXPJKRG3IM7": "blend/v2/backstop",
+    "CDSYOAVXFY7SM5S64IZPPPYB4GVGGLMQVFREPSQQEZVIWXX5R23G4QSU": "blend/v2/pool-factory",
+    "CAJJZSGMMM3PD7N33TAPHGBUGTB43OC73HVIK2L2G6BNGGGYOSSYBXBD": "blend/v2/pool",
+    "CCCCIQSDILITHMM7PBSLVDT5MISSY7R26MNZXCX4H7J5JQ5FPIYOGYFS": "blend/v2/pool"
+  },
+  "byWasmHash": {
+    "c1f4502a757e25c611f5a159bc1ab0eef64085adac6c68123dca66e87faffbc2": "blend/v2/backstop",
+    "31328050548831f63d2b72e37bcfd0bb7371b7907135755dbe09ed434d755ca9": "blend/v2/pool-factory",
+    "a41fc53d6753b6c04eb15b021c55052366a4c8e0e21bc72700f461264ec1350e": "blend/v2/pool"
+  }
 }

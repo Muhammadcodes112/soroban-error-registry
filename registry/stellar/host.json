@@ -1,0 +1,392 @@
+{
+  "schema_version": 1,
+  "kind": "host",
+  "protocol": {
+    "id": "stellar",
+    "name": "Soroban host",
+    "network_protocol": 28
+  },
+  "source": {
+    "repo": "https://github.com/stellar/rs-soroban-env",
+    "commit": "5061e9c40ce6fc74ade9b9b3b49465b0cf7fdccb",
+    "tag": "v28.0.2"
+  },
+  "errors": [
+    {
+      "type": "Auth",
+      "code": "ExistingValue",
+      "summary": "This signed authorization was already used (replayed nonce).",
+      "explanation": "Every signed auth entry carries a nonce that can only be consumed once.",
+      "messages": [
+        "nonce already exists for address"
+      ],
+      "category": "transaction-building",
+      "common_causes": [
+        "Resubmitting a transaction (or reusing auth entries) that already succeeded.",
+        "Copying signed auth entries from one transaction into another."
+      ],
+      "fixes": [
+        "Re-simulate to get fresh auth entries with a new nonce, then sign again."
+      ],
+      "source_files": [
+        "soroban-env-host/src/auth.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Auth",
+      "code": "InvalidAction",
+      "summary": "A required authorization was missing or failed.",
+      "explanation": "\"Unauthorized function call for address\" means a contract called require_auth() (or require_auth_for_args) for an address, and the transaction had no matching signed auth entry. \"failed account authentication with error\" means a matching entry existed but the account rejected it. For a classic G-account, look for Error(Contract, #5) in the diagnostic events (see stellar/sac#5). For a smart wallet, it is that wallet's own __check_auth error.",
+      "messages": [
+        "Unauthorized function call for address",
+        "failed account authentication with error"
+      ],
+      "category": "permissions",
+      "common_causes": [
+        "The transaction was not re-simulated after its arguments changed, so the auth entry covers different arguments.",
+        "Signing with the wrong account, or not signing the auth entries at all (only the transaction envelope).",
+        "A contract calling another contract on its own behalf without authorize_as_current_contract().",
+        "A multisig or smart-wallet signer set that does not meet the account's rules."
+      ],
+      "fixes": [
+        "Simulate the exact final transaction and sign every returned auth entry for the address named in the event.",
+        "Read the next diagnostic event to see why the account rejected the signature."
+      ],
+      "source_files": [
+        "soroban-env-host/src/auth.rs"
+      ],
+      "references": [
+        {
+          "title": "Stellar docs — Authorization",
+          "url": "https://developers.stellar.org/docs/learn/fundamentals/contract-development/authorization"
+        }
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Auth",
+      "code": "InvalidInput",
+      "summary": "The signed authorization has expired, or its expiry is too far ahead.",
+      "explanation": "Each signed auth entry has a signature expiration ledger. It must not have passed, and it must not be beyond the network's maximum TTL.",
+      "messages": [
+        "signature has expired",
+        "signature expiration is too late"
+      ],
+      "category": "transaction-building",
+      "common_causes": [
+        "The user took too long to sign, or the transaction was submitted long after signing.",
+        "Setting the expiration ledger far in the future by hand."
+      ],
+      "fixes": [
+        "Re-simulate and re-sign the auth entries with an expiration ledger a short way past the current ledger, then submit promptly."
+      ],
+      "source_files": [
+        "soroban-env-host/src/auth.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Budget",
+      "code": "ExceededLimit",
+      "summary": "The call ran out of CPU instructions or memory.",
+      "explanation": "The invocation used more CPU instructions or memory than the transaction declared, or than the network allows. Wasm stack overflow and running out of fuel map here too. This error cannot be caught by a calling contract.",
+      "category": "resources",
+      "common_causes": [
+        "Resources come from an old simulation, and the contract's state has since grown (larger vectors or maps to iterate).",
+        "Unbounded loops over storage, or storing large Vec/Map values in one key.",
+        "Heavy cryptography or deep recursion."
+      ],
+      "fixes": [
+        "Re-simulate right before submitting, and add a safety margin to the instruction limit.",
+        "If simulation itself fails here, the work exceeds network limits: paginate, split the work across transactions, or move large collections into separate storage keys.",
+        "Check current network limits with `stellar network settings`."
+      ],
+      "source_files": [
+        "soroban-env-host/src/budget/dimension.rs",
+        "soroban-env-common/src/error.rs"
+      ],
+      "references": [
+        {
+          "title": "Stellar docs — Resource limits & fees",
+          "url": "https://developers.stellar.org/docs/networks/resource-limits-fees"
+        }
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Context",
+      "code": "ExceededLimit",
+      "summary": "Call depth or value nesting went past the host's limit.",
+      "explanation": "Raised when contract-to-contract calls (or recursion) nest too deeply, or when a value or XDR structure is too deep or too large to decode.",
+      "category": "contract-bug",
+      "common_causes": [
+        "Recursive cross-contract calls.",
+        "Deeply nested data structures passed as arguments."
+      ],
+      "fixes": [
+        "Flatten the call chain or the data structure."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/frame.rs",
+        "soroban-env-common/src/error.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Context",
+      "code": "InvalidAction",
+      "summary": "The call pattern is not allowed: re-entry, a reserved function, or a failed constructor.",
+      "messages": [
+        "Contract re-entry is not allowed",
+        "can't invoke a reserved function directly",
+        "constructor invocation has failed with error"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "Contract A calls B, and B calls back into A in the same invocation.",
+        "Calling __constructor or __check_auth directly.",
+        "A deploy whose constructor panicked; the next diagnostic event holds the constructor's own error."
+      ],
+      "fixes": [
+        "Restructure so callbacks into the original contract are not needed.",
+        "For constructors, look up the inner error emitted just before this one."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/frame.rs",
+        "soroban-env-host/src/host/lifecycle.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Crypto",
+      "code": "InvalidInput",
+      "summary": "A signature or cryptographic input failed verification.",
+      "explanation": "Raised by host crypto functions such as ed25519_verify and secp256r1_verify (passkeys), and by BLS12-381 or BN254 operations given invalid input. In smart wallets this usually means the signature does not match the payload being authorized.",
+      "messages": [
+        "failed ED25519 verification",
+        "failed secp256r1 verification",
+        "ECDSA signature 's' part is not normalized to low form",
+        "invalid ed25519 public key"
+      ],
+      "category": "permissions",
+      "common_causes": [
+        "Signing a different payload than the contract verifies (e.g. the wrong auth-entry preimage or network passphrase).",
+        "Passkey (secp256r1) signatures not in 64-byte compact form, or with a high 's' value that was not normalised to low-S.",
+        "Using the wrong public key for the signer."
+      ],
+      "fixes": [
+        "Recompute the signed payload exactly as the contract does, including the network passphrase.",
+        "Normalise secp256r1 signatures to compact low-S form before sending."
+      ],
+      "source_files": [
+        "soroban-env-host/src/crypto/mod.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Object",
+      "code": "IndexBounds",
+      "summary": "A Vec or Bytes index was out of range.",
+      "explanation": "The contract used an unchecked or panicking accessor on a host object with an index past its end.",
+      "messages": [
+        "object index out of bounds",
+        "bytes_get out of bounds"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "Vec::get_unchecked, Bytes::get_unchecked or a slice call on an empty or shorter-than-expected collection."
+      ],
+      "fixes": [
+        "Use the checked get(), which returns an Option, and handle the empty case, or check len() first."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/error.rs",
+        "soroban-env-host/src/host.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Object",
+      "code": "MissingValue",
+      "summary": "A Map key the contract required is not in the map.",
+      "messages": [
+        "map key not found in map_get",
+        "map key not found in map_del"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "Map::get_unchecked or remove_unchecked for a key that is not present."
+      ],
+      "fixes": [
+        "Use Map::get(), which returns an Option, and handle the missing case."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Storage",
+      "code": "ExceededLimit",
+      "summary": "The contract touched a ledger entry that is not in the transaction's footprint.",
+      "explanation": "Every Soroban transaction lists up front which ledger entries it may read or write. Accessing anything else, or writing an entry listed as read-only, fails here. The message names the kind of key (contract data key, contract instance, account trustline, ...). This error cannot be caught by a calling contract.",
+      "messages": [
+        "trying to access {} outside of the footprint",
+        "trying to access nonce outside of footprint for address"
+      ],
+      "category": "transaction-building",
+      "common_causes": [
+        "Submitting without simulating, or with a hand-built footprint.",
+        "State changed between simulation and submission, so the contract now reads a different key (e.g. a new user, an oracle round, or a different pool position).",
+        "Changing the arguments after simulating."
+      ],
+      "fixes": [
+        "Simulate and assemble the transaction (e.g. rpc.prepareTransaction) right before signing.",
+        "If state moves fast, re-simulate and retry automatically on this error."
+      ],
+      "source_files": [
+        "soroban-env-host/src/storage.rs",
+        "soroban-env-host/src/auth.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Storage",
+      "code": "ExistingValue",
+      "summary": "A contract already exists at this address.",
+      "explanation": "Contract addresses are derived from the deployer and a salt, so deploying again with the same pair targets an address that is taken.",
+      "messages": [
+        "contract already exists"
+      ],
+      "category": "user-input",
+      "fixes": [
+        "Deploy with a different salt, or use the existing contract."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/lifecycle.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Storage",
+      "code": "InvalidAction",
+      "summary": "The storage operation is not allowed for this kind of entry.",
+      "messages": [
+        "trying to extend temporary entry past max TTL allowed by network: {} > {}",
+        "instance storage should be extended via `extend_current_contract_instance_and_code_ttl` function only"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "Calling extend_ttl on a temporary entry with extend_to above the network's max TTL.",
+        "Extending instance storage through the generic data-TTL path instead of env.storage().instance().extend_ttl()."
+      ],
+      "fixes": [
+        "Cap TTL extensions at the network max, and use the instance-specific extend function for instance storage."
+      ],
+      "source_files": [
+        "soroban-env-host/src/storage.rs",
+        "soroban-env-host/src/host.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Storage",
+      "code": "MissingValue",
+      "summary": "The contract read a storage entry that does not exist.",
+      "explanation": "The message names what was missing. A missing \"contract instance\" usually means the contract ID does not exist on this network. A missing \"contract data key\" means the contract read a key that was never written, or a temporary entry that expired and was deleted.",
+      "messages": [
+        "trying to get non-existing value for {}",
+        "key is missing from instance storage"
+      ],
+      "category": "protocol-state",
+      "common_causes": [
+        "Calling a contract ID from another network (testnet ID on mainnet), or a contract that was never deployed.",
+        "The contract reads config that was never initialised (e.g. an init or constructor step was skipped).",
+        "A temporary entry such as a lock, allowance or cache expired."
+      ],
+      "fixes": [
+        "Check the contract ID and network.",
+        "Make sure required setup or initialisation ran.",
+        "In contract code, use storage().get(), which returns an Option, or has() for keys that may be absent."
+      ],
+      "source_files": [
+        "soroban-env-host/src/storage.rs",
+        "soroban-env-host/src/host.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "Value",
+      "code": "ExceededLimit",
+      "summary": "The Wasm code is too large to upload.",
+      "messages": [
+        "Wasm code is too large"
+      ],
+      "category": "resources",
+      "fixes": [
+        "Build with `stellar contract build` (release profile, opt-level \"z\", lto) and run `stellar contract optimize`.",
+        "Split the contract or drop unused dependencies."
+      ],
+      "source_files": [
+        "soroban-env-host/src/host/lifecycle.rs"
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "WasmVm",
+      "code": "InvalidAction",
+      "summary": "The contract trapped — usually a Rust panic in contract code.",
+      "explanation": "A Wasm `unreachable` trap maps to this error, and that is what a Rust panic compiles to: unwrap() or expect() on None/Err, panic!(), an out-of-bounds slice index, or arithmetic overflow with overflow-checks on. Contracts that return a #[contracterror] value show Error(Contract, #N) instead, so this means the failure had no named error. It is also raised when the Wasm calls a host function the current protocol does not support.",
+      "messages": [
+        "contract calls a host function not yet supported by current protocol",
+        "contract calls a host function no longer supported in the current protocol"
+      ],
+      "category": "contract-bug",
+      "common_causes": [
+        "unwrap() on a storage read or a conversion that failed.",
+        "Integer overflow in release builds with overflow-checks = true.",
+        "A contract built with a newer soroban-sdk than the network's protocol supports."
+      ],
+      "fixes": [
+        "Check the diagnostic events for the panic message or log() output just before the trap.",
+        "Reproduce in a unit test with soroban-sdk testutils to get the panic location.",
+        "Replace panics with panic_with_error!/Result and a #[contracterror] enum so callers see a meaningful code.",
+        "Match the soroban-sdk major version to the network protocol."
+      ],
+      "source_files": [
+        "soroban-env-common/src/error.rs",
+        "soroban-env-host/src/vm/parsed_module.rs"
+      ],
+      "references": [
+        {
+          "title": "Stellar docs — Debugging errors",
+          "url": "https://developers.stellar.org/docs/learn/fundamentals/contract-development/errors-and-debugging/debugging-errors"
+        }
+      ],
+      "status": "draft"
+    },
+    {
+      "type": "WasmVm",
+      "code": "MissingValue",
+      "summary": "The function you called does not exist on this contract.",
+      "messages": [
+        "trying to invoke non-existent contract function"
+      ],
+      "category": "user-input",
+      "common_causes": [
+        "A typo in the function name.",
+        "Calling the right name on the wrong contract, or on an older deployed version that lacks the function.",
+        "Client bindings generated from a different contract version."
+      ],
+      "fixes": [
+        "List the deployed contract's functions with `stellar contract info interface --id <C...>` and compare.",
+        "Regenerate client bindings from the deployed contract."
+      ],
+      "source_files": [
+        "soroban-env-host/src/vm.rs"
+      ],
+      "status": "draft"
+    }
+  ]
+}

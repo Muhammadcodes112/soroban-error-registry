@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Akshola00/soroban-error-registry/schema/host.schema.json",
+  "title": "Soroban Error Registry — host error file",
+  "description": "Explanations for errors raised by the Soroban host itself, shown as Error(<Type>, <Code>), e.g. Error(Storage, MissingValue). These mean the same thing in every contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "protocol", "source", "errors"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "host" },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "network_protocol"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "network_protocol": { "type": "integer", "minimum": 20, "description": "Stellar network protocol version these entries describe." }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo", "commit"],
+      "properties": {
+        "repo": { "type": "string", "format": "uri" },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "tag": { "type": "string" }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "code", "summary", "category", "fixes", "source_files", "status"],
+        "properties": {
+          "type": { "enum": ["Context", "WasmVm", "Storage", "Object", "Crypto", "Events", "Budget", "Value", "Auth"] },
+          "code": { "enum": ["ArithDomain", "IndexBounds", "InvalidInput", "MissingValue", "ExistingValue", "ExceededLimit", "InvalidAction", "InternalError", "UnexpectedType", "UnexpectedSize"] },
+          "summary": { "type": "string", "minLength": 10, "maxLength": 140 },
+          "explanation": { "type": "string" },
+          "messages": {
+            "type": "array",
+            "description": "Diagnostic-event messages exactly as written in the host source ({} = formatted value). --check-source confirms each one appears in source_files.",
+            "items": { "type": "string", "minLength": 5 }
+          },
+          "category": { "enum": ["user-input", "account-state", "protocol-state", "permissions", "resources", "contract-bug", "transaction-building", "internal"] },
+          "common_causes": { "type": "array", "items": { "type": "string" } },
+          "fixes": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "source_files": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["title", "url"],
+              "properties": { "title": { "type": "string" }, "url": { "type": "string", "format": "uri" } }
+            }
+          },
+          "status": { "enum": ["draft", "reviewed"] },
+          "reviewed_by": { "type": "array", "items": { "type": "string", "pattern": "^@[A-Za-z0-9-]+$" } }
+        }
+      }
+    }
+  }
+}

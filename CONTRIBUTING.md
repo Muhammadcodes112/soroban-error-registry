@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping make Soroban errors readable. There are three kinds of contribution.
+Thanks for helping make Soroban errors readable. There are four kinds of contribution.
 
 ## 1. Review an existing entry (easiest)
 
@@ -20,9 +20,19 @@ You cannot review an entry you wrote.
 5. Leave `status` as `"draft"`.
 6. Run `npm run validate:source` before opening the PR.
 
-## 3. Map deployments
+Pin `source.commit` to the commit the **deployed** contract was built from, not just the latest main. Verified builds on stellar.expert show it, and so do a protocol's release notes.
 
-Fill a contract's `deployments` with mainnet/testnet contract IDs or wasm hashes. **Every entry needs a `verified_by` link** to official docs, a release note, or the protocol's own deployment file — not just an explorer search result.
+## 3. Add a host error
+
+1. Find where the host raises it in `rs-soroban-env` at the tag matching the current mainnet protocol. Search `soroban-env-host/src` for `ScErrorType::<Type>` next to `ScErrorCode::<Code>`.
+2. Add an entry to `registry/stellar/host.json`, sorted by `Type,Code`. Copy the diagnostic `messages` **exactly** as they appear in the source, and list the files in `source_files`. `npm run validate:source` fails if a message isn't found word for word.
+3. Only describe causes you can trace in the source, or reproduce on testnet.
+
+When mainnet moves to a new protocol, bump `network_protocol` and `source` to the new tag and re-run `validate:source`.
+
+## 4. Map deployments
+
+Fill a contract's `deployments` with mainnet/testnet contract IDs or wasm hashes. **Every entry needs a `verified_by` link** to official docs, a release note, or the protocol's own deployment file, not just an explorer search result. Prefer the wasm hash when many contracts share one code (like Blend pools): one entry then covers every instance.
 
 ## Writing guidelines
 

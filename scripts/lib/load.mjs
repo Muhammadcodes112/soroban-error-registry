@@ -29,3 +29,6 @@ export async function loadRegistry() {
 /** Lookup key = file path under registry/ without .json, e.g. "blend/v2/pool". */
 export const keyOf = (path) =>
   path.replace(/\\/g, "/").replace(/^registry\//, "").replace(/\.json$/, "");
+
+/** Host errors are keyed "Type,Code", e.g. "Storage,MissingValue". */
+export const hostKey = (e) => `${e.type},${e.code}`;

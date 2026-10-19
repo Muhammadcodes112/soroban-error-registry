@@ -6,65 +6,73 @@ Ready to paste into GitHub Issues for Drips Wave. Each one is scoped so a single
 
 ## Trivial
 
-### 1. Review SAC entries #2–#7
-Check `registry/stellar/sac.json` codes 2–7 against `soroban-env-host/src/builtin_contracts/stellar_asset_contract/` at the pinned commit. Correct the text where needed, then mark them `reviewed`.
-**Done when:** six entries are `reviewed` with your handle, and CI passes.
+### 1. Review SAC entries #2–#9
+Check `registry/stellar/sac.json` codes 2–9 against `soroban-env-host/src/builtin_contracts/` at the pinned commit (v28.0.2). Each entry quotes the host messages, so search for them. Correct the text where needed, then mark the entries `reviewed`.
+**Done when:** the entries are `reviewed` with your handle, and CI passes.
 
-### 2. Review SAC entries #8–#15
-Same as #1 for codes 8–15. Pay special attention to #10 (`BalanceError`): confirm whether exceeding a trustline limit also raises it.
+### 2. Review SAC entries #10–#15
+Same as #1 for codes 10–15. `BalanceError` (#10) has the most raise sites, so trace every one of them.
 
-### 3. Review Blend v2 pool entries #1200–#1212
-Trace each `panic_with_error!` in `blend-contracts-v2/pool/src` and confirm the explanation. Mark them reviewed.
+### 3. Review host entries: Auth, Budget, Context, Crypto
+Check each entry in `registry/stellar/host.json` against `rs-soroban-env` v28.0.2. Bonus: reproduce one on testnet and add the transaction hash to the PR.
 
-### 4. Review Blend v2 pool entries #1213–#1224
-Same as #3 for the remaining pool codes.
+### 4. Review host entries: Object, Storage, Value, WasmVm
+Same as #3 for the remaining host entries.
 
-### 5. Review Blend v2 backstop and pool-factory entries
+### 5. Review Blend v2 pool entries #1200–#1212
+Trace each `panic_with_error!` in `blend-contracts-v2/pool/src` at the pinned commit and confirm the explanation. Mark them reviewed.
+
+### 6. Review Blend v2 pool entries #1213–#1224
+Same as #5 for the remaining pool codes.
+
+### 7. Review Blend v2 backstop and pool-factory entries
 Covers `backstop.json` and `pool-factory.json`.
 
 ---
 
 ## Medium
 
-### 6. Map Blend v2 mainnet deployments
-Fill `deployments` for the pool factory, the backstop, and the main v2 pools (or their shared pool wasm hash). Each entry needs a `verified_by` link to Blend's official docs or deployment files.
-**Done when:** `soroban-explain <mainnet pool contract id> 1205` resolves.
+### 8. Add Blend v1
+v1 pools are still live on mainnet. Add `registry/blend/v1/{pool,backstop,pool-factory}.json` from `blend-contracts` at the deployed commit. The v1 wasm hashes are already listed in blend-utils' `mainnet.contracts.json`.
 
-### 7. Add Soroswap (router, pair, factory)
-Add `registry/soroswap/…` from the `soroswap/core` repo error enums, with every variant explained.
+### 9. Add Soroswap (router, pair, factory)
+Add `registry/soroswap/…` from the `soroswap/core` error enums, explain every variant, and map the mainnet deployments.
 
-### 8. Add Aquarius AMM
+### 10. Add Aquarius AMM
 Add the Aquarius pool and router error enums.
 
-### 9. Add the Reflector oracle
+### 11. Add the Reflector oracle
 Oracle failures show up inside lending and DEX transactions, so explaining them helps across protocols.
 
-### 10. Add OpenZeppelin Stellar contracts (fungible token, access control, pausable)
+### 12. Add OpenZeppelin Stellar contracts (fungible token, access control, pausable)
 Many new tokens are built on these, so one file covers many deployed contracts. Map each module's error enum to its own file.
 
-### 11. Add DeFindex vaults and strategies
+### 13. Add DeFindex vaults and strategies
 
-### 12. Scope `--check-source` to the named enum
-`scripts/validate.mjs` currently collects every `Name = N,` line in the source file. That breaks when one file defines several enums. Use `source.enum` to parse only the matching `pub enum <Name> { … }` block, and add tests for a file with two enums.
+### 14. More host errors
+Add the next most common host errors not covered yet, for example `Value,UnexpectedType`, `Object,UnexpectedSize` and `WasmVm,IndexBounds`. Every message must pass `validate:source`.
 
-### 13. Static lookup page on GitHub Pages
-A single page where someone pastes a contract key (or contract ID) and a code and sees the explanation. It should build from `dist/registry.json` with no backend.
+### 15. Static lookup page on GitHub Pages
+A single page where someone pastes an error (and a contract key, ID or wasm hash for contract errors) and sees the explanation. Import `src/index.mjs` directly; no backend needed.
 
-### 14. Publish to npm with a release workflow
+### 16. Publish to npm with a release workflow
 Publish on tag, attach `dist/registry.json` to the GitHub release, and document a stable raw URL.
 
 ---
 
 ## High
 
-### 15. Generate skeleton files from a deployed wasm
-`npm run scaffold -- <contract-id> --network mainnet` should fetch the contract's wasm, read the `contractspecv0` section, and write a draft registry file with every error name, code and doc comment filled in. A human then writes the explanations. This makes adding new protocols much faster.
+### 17. `soroban-explain tx <hash>`
+Fetch a failed transaction from Stellar RPC, find the first `error` diagnostic event and the contract that emitted it, read that contract's wasm hash from its instance entry, and explain every error in the chain, including wrapped ones like `Error(Auth, InvalidAction)` → `Error(Contract, #5)`. Keep it in a separate optional entry point so the core library stays dependency-free.
 
-### 16. Host-error layer (`Error(Storage, MissingValue)`, `Error(Auth, InvalidAction)`, `Error(Budget, ExceededLimit)` …)
-Design a schema extension for host errors (type + code instead of contract + code), and add a `stellar/host` file. Discuss the design in the issue before writing code.
+### 18. Generate skeleton files from a deployed wasm
+`npm run scaffold -- <contract-id> --network mainnet` should fetch the contract's wasm, read the `contractspecv0` section, and write a draft registry file with every error name, code and doc comment filled in. A human then writes the explanations.
 
-### 17. Integrate with Erst
-Open a PR to [dotandev/hintents](https://github.com/dotandev/hintents) that loads `dist/registry.json` so Erst's suggestion output shows registry explanations for known contracts. Link the PR here.
+### 19. Integrate with Erst
+Open a PR to [dotandev/hintents](https://github.com/dotandev/hintents) that loads `dist/registry.json`, so Erst's suggestion output shows registry explanations for host errors and known contracts. Link the PR here.
 
-### 18. Integrate with soroban-diagnose
-Same as #17 for soroban-diagnose: after it resolves `Error(Contract, #N)` to a variant name, attach the registry's summary and fixes.
+### 20. Integrate with soroban-diagnose
+Same as #19 for soroban-diagnose: after it resolves `Error(Contract, #N)` to a variant name, attach the registry's summary and fixes.
+
+### 21. MCP server
+Expose `explain` as an MCP tool, so AI coding agents can look up Soroban errors while debugging.
